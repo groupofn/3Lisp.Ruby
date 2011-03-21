@@ -1,0 +1,498 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;                   ;;;
+;;;                   ;;;
+;;; 3LispR Test Cases ;;;
+;;;                   ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;
+;;;
+;;; Basics 
+;;;
+
+;;; Types
+
+(type 1)
+(type '1)
+(type $F)
+(type $T)
+(type '$F)
+(type '$T)
+(type [1 2 3])
+(type '[1 2 3])
+(type '['a 'b 'c])
+(type +)
+(type 'abc)
+(type '+)
+(type ↑+)
+(type ''abc)
+(type '(a . b))
+(type lambda)
+(type (lambda simple [x] (+ x 1)))
+
+;;; Booleans
+
+(and $T $T $F)
+(and (= '[] '[]))
+(and)
+(and . (tail 1 [$F $T $T]))
+
+(or $F $F $T)
+(or (= '[] '[]))
+(or)
+(or . (tail 1 [$T $F $F]))
+
+;;; Equality (actually referential identity)
+
+(= [1 2 3] [1 2 3])
+(= '[1 2 3] '[1 2 3])
+(= [1 2 3] '[1 2 3])
+
+;;; LET
+
+(let [[x 10][y (empty [])]]
+	(if y
+		(* x x)
+		(+ x x)))
+		
+;;; binding
+
+(rebind 'a '10 global)
+(binding 'a global)
+
+;;; ↑↓
+
+; ↓ tests from diss.p483
+↓'[1 2 3 4]
+
+↓(prep '1 (rcons '2 '3 '4))
+
+↓↓''''A
+
+(+ . ↓(rcons '1 '2))
+
+(let [[x '$F]] [(type x) (type ↓x)])
+
+↓'(pcons 'a 'b)
+
+↓(pcons 'pcons (rcons ''a ''b))
+
+; these last two ain't correct
+
+↓(pcons 'a 'b)
+↓(+ 2 3)
+
+;;;
+;;; Basics 
+;;;
+;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;
+;;;
+;;; Lambda
+;;;
+
+((lambda simple [x] x) 100)
+
+(define a (lambda simple [b] (b 1 2)))
+(a +)
+
+; lambda tests from BCS diss.pp437-443
+; should => 18
+((lambda simple [f]
+  (f (f 3 4) (f 5 6)))
++)
+
+; should => [30]
+((lambda simple [g1 g2]
+  (g1 (= (nth 1 '[$T]) (nth 1 ['$T]))
+      (g2 [10 20 30])
+      (g2 '[10 20 30])))
+if
+(lambda simple [r] (tail 2 r)))
+
+; should => 10
+(((lambda simple [f]
+    (f simple [y] (+ y y)))
+  lambda)
+5)
+
+; should => 3
+((lambda simple [fun]
+  ((lambda simple [y]
+    (fun y))
+  2))
+ ((lambda simple [y]
+   (lambda simple [x] (+ x y)))
+1))
+
+; should => 7
+((lambda simple [a](a 3 4)) (lambda simple [b c](+ b c)))
+
+; tricky lambda testing lexical scopes
+(define trouble
+  (lambda simple [args]
+    (let [[proc! (1st args)]]
+      (cond
+        [(= proc! 0)
+           (let [[binding! (trouble (rest args))]]
+             (+ (1st args) binding!))]
+        [(= proc! 1) 2]))))
+(trouble [0 1]) ; should => 2
+
+; without using LET
+(define trouble1
+  (lambda simple [args]
+    ((lambda simple [n]
+       (if (= n 0)
+           ((lambda simple [x]
+              (+ (nth 1 args) x))
+            (trouble1 (tail 1 args)))
+           (if (= n 1)
+               2
+               10000)))
+     (nth 1 args))))
+(trouble1 [0 1]) ; should => 2
+
+;;;
+;;; Lambda
+;;;
+;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;
+;;;
+;;; Recursion
+;;;
+
+;;; simple recursion
+
+(define factorial (lambda simple [x] (if (= x 0) 1 (* x (factorial (- x 1))))))
+(factorial 0)
+(factorial 100)
+
+;;; mutual recursion
+
+(define even
+  (lambda simple [n]
+    (if (= 0 n) 
+        $T
+        (odd (- n 1)))))
+
+(define odd
+  (lambda simple [n]
+    (if (= 0 n)
+        $F
+        (even (- n 1)))))
+
+(even 0)
+(even 100)
+(even 101)
+(odd 0)
+(odd 100)
+(odd 101)
+
+;;;
+;;; Recursion
+;;;
+;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Control flow
+;;;
+
+(block (terpri) (terpri) (terpri))
+
+(ef (= 1 1) (+ 3 3) (* 3 3))
+
+(cond
+	[(= 1 2) 'ha]
+	[(not (= (* 3 3) (/ 18 2))) (empty [])]
+	[$T 'blah])
+
+((if (even 3) + -) 4 5)
+((nth 2 [+ if lambda]) $T 0 1)
+
+;;;
+;;; Control flow
+;;;
+;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;
+;;;
+;;; Reflection 
+;;;
+
+;;; Illustration of the tower
+
+1
+(normalise '1 global id)
+(normalise '(normalise '1 global id) global id)
+(normalise '(normalise '(normalise '1 global id) global id) global id)
+(normalise '(normalise '(normalise '(normalise '1 global id) global id) global id) global id)
+(normalise '(normalise '(normalise '(normalise '(normalise '1 global id) global id) global id) global id) global id)
+
+;;; basic reflection tests 
+
+; test case from Implementation paper
+
+(define three (lambda reflect [[] env cont] (cont '3)))
+(three)
+
+(define quit (lambda reflect [args env cont] 'done))
+(+ 2 (quit))
+(read-normalise-print 1 global)
+(read-normalise-print 2001 global)
+(quit)
+(quit)
+
+; environment manipulation
+
+((lambda reflect [[x] env cont] (normalise '(+ x 1) (bind 'x x env) cont)) 10)
+
+;;; DEFINE can be defined
+
+((lambda reflect [args env cont]
+   (block (rebind 'b '10 env)
+          (cont 'done))))
+; b is now bound to 10
+
+(define DEFINE-2
+    (lambda reflect [[var def] env cont]
+        (normalise def env
+            (lambda simple [def!]
+                (block (rebind var def! env)
+                       (cont ↑var))))))
+(define-2 100+
+  (lambda simple [x]
+    (+ 100 x)))
+(100+ 1) ; should => 101
+
+;;; SCHEME-CATCH
+
+(define scheme-catch
+  (lambda reflect [[tag body] catch-env catch-cont]
+    (normalise body 
+	  (bind tag ↑(lambda reflect [[answer] throw-env throw-cont]
+	               (normalise answer throw-env catch-cont))
+		    catch-env)
+	  catch-cont)))
+
+; should => 17
+((lambda simple [x]
+   (+ 2 (scheme-catch punt 
+                      (* 3 (/ 4 (if (= x 1)
+					                (punt 15)
+									(- x 1))))))) 1)
+
+;;; BREAK
+
+(define BREAK 
+  (lambda reflect [[arg] env cont]
+    (block 
+      (print arg) 
+      (read-normalise-print 'debug
+        (bind '[env cont return]
+              [↑env ↑cont ↑(lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
+              env)))))
+
+(define factorial-with-break-point 
+  (lambda simple [x] 
+    (if 
+      (= x 0) 
+      1 
+      (break (* x (factorial-with-break-point (- x 1))))))) ; uses BREAK
+
+; use "(return VAL)" to exit BREAK
+(factorial-with-break-point 5)
+
+;;; Reflective continuation vs. regular (simple) continuation
+
+(define quote (lambda reflect [[a] e c] (c ↑a)))
+(normalise '1 global id)
+(normalise '1 global quote)
+(normalise '+  global id)
+(normalise '+ global quote)
+(normalise '(+ 1 2) global id)
+(normalise '(+ 1 2) global quote)
+(normalise-rail '[] global id)
+(normalise-rail '[] global quote)
+(normalise-rail '[1] global id)
+(normalise-rail '[1] global quote)
+
+;;; More reflective continuation
+
+(define alpha
+  (lambda reflect [[alpha-arg] alpha-env alpha-cont] [alpha-arg alpha-env alpha-cont]))
+
+(normalise '3 global alpha)
+(normalise 'x global alpha)
+(normalise '(+ 2 3) global alpha)
+(normalise '[] global alpha)
+
+; this is a mistaken one ...
+
+((lambda simple [x y]  
+   (normalise '[x x y y] global alpha))
+3 4)
+
+((lambda simple [x y]  ;; this is a correct one ...
+   (normalise '[+ - * /] global alpha))
+3 4)
+
+(normalise-rail '[] global alpha)
+(normalise '(lambda simple [a] (+ a a)) global alpha)
+
+;;;
+;;; Reflection
+;;;
+;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; A version of the RPP that normalises arguments right to left.
+;;; From a discussion with Brian
+;;;
+
+;;; Brian's original code
+
+(define normalise#
+  (lambda simple [exp env cont]
+    (cond [(normal exp) (cont exp)]
+          [(atom exp) (cont (binding exp env))]
+          [(rail exp) (normalise-rail# exp env cont)]
+          [(pair exp) (reduce# (car exp) (cdr exp) env cont)])))
+
+(define reduce#
+  (lambda simple [proc args env cont]
+    (normalise# proc env
+      (lambda simple [proc!]
+        (if (reflective proc!)
+            (↓(de-reflect proc!) args env cont)
+            (normalise# args env ; JL: changed "normalise" to "normalise#"
+              (lambda simple [args!]
+                (if (primitive proc!)
+                    (cont ↑(↓proc! . ↓args!))
+                    (normalise#
+                       (body proc!)
+                       (bind (pattern proc!) args! (environment proc!))
+                       cont)))))))))
+
+
+(define normalise-rail#
+  (lambda simple [rail env cont]
+     (if (empty rail)
+         (cont rail)
+         (normalise-rail# (rest rail) env
+            (lambda simple [rest!]
+               (normalise# (1st rail) env
+                  (lambda simple [first!]
+                     (cont (prep first! rest!)))))))))
+                     
+(define block#
+  (lambda reflect [clauses env cont]
+    (normalise-rail# clauses env 
+      (lambda simple [clauses!]
+        (cont (nth (length clauses!) clauses!))))))
+
+;;; Simple test case for block#
+
+(block# (+ 2 3) (print 'A) (* 2 3))
+
+;;; Test cases. The first should print "AB" before returning '[5 6];
+;;; the second should print "BA" but return the same result.
+
+(normalise
+   '[(block (+ 2 3) (print 'A) (+ 2 3))
+     (block (* 2 3) (print 'B) (* 2 3))]
+   global
+   id)
+
+(normalise#
+   '[(block# (+ 2 3) (print 'A) (+ 2 3))
+     (block# (* 2 3) (print 'B) (* 2 3))]
+   global
+   id)
+
+;;; Note that the definitions of NORMALISE and NORMALISE# establish
+;;; the order of argument normalisation independent of how *they*
+;;; are normalised.  Thus the following 4 cases print "AB", "BA",
+;;; "AB", and "BA", respectively.  This shows that the 3Lisp RPP
+;;; enforces left-to-right argument processing (rather than merely
+;;; absorbing it from levels above).
+
+;;; JL: add ' before the inner call to normalise... for the last 3 cases
+
+(normalise
+  '(normalise
+     '[(block (print 'A) (+ 2 3))
+       (block (print 'B) (* 2 3))]
+     global
+     id)
+  global
+  id)
+
+(normalise
+  '(normalise#
+    '[(block# (print 'A) (+ 2 3))
+      (block# (print 'B) (* 2 3))]
+    global
+    id)
+  global
+  id)
+
+(normalise#
+  '(normalise
+    '[(block (print 'A) (+ 2 3))
+      (block (print 'B) (* 2 3))]
+    global
+    id)
+  global
+  id)
+
+(normalise#
+  '(normalise#
+    '[(block# (print 'A) (+ 2 3))
+      (block# (print 'B) (* 2 3))]
+    global
+    id)
+  global
+  id)
+
+
+;;; JL: The following test-cases, would test order of argument normalization directly
+
+(normalise  '(+ (block  (print 'A) 2) (block  (print 'B) 3)) global id)
+(normalise# '(+ (block# (print 'A) 2) (block# (print 'B) 3)) global id)
+
+;;; JL: Test cases for interaction of normalise? and block? ...
+;;;     The last one is the interesting one. The error reported there
+;;;     is from pattern matching for argument binding.
+
+(normalise  '(block   (print 'A) 2) global id)
+(normalise# '(block#  (print 'A) 2) global id)
+(normalise  '(block#  (print 'A) 2) global id)
+(normalise# '(block   (print 'A) 2) global id)
+
+;;; JL: Just FYI, block is defined as follows
+;
+;(define BLOCK
+;  (lambda reflect [clauses env cont]
+;    (if (unit clauses)
+;		 (normalise (1st clauses) env cont)
+;        (normalise (1st clauses) env
+;          (lambda simple []                      ; BLOCK continuation
+;            (normalise (pcons 'block (rest clauses)) env cont)))) 
+
+;;;
+;;; A version of the RPP that normalises arguments right to left.
+;;; From a discussion with Brian
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+

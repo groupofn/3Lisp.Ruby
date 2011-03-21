@@ -1,0 +1,187 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;  This file is loaded as 3LispR launches.
+;;;
+;;;  You can add definitions of your own, following DEFINE below. 
+;;;  These procedures will be available after 3LispR is launched.
+;;;
+;;;  NOTE: Before including a new definition here, you might want to 
+;;;  test it first at the interactive prompt. This is because error 
+;;;  messages from parsing and processing this file are suppressed.
+;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Some Essentials
+;;;
+
+;;; DEFEINE
+(rebind 'define
+  ↑(lambda reflect [[var def] env cont]
+    (normalise def env 
+      (lambda simple [def!] 
+        (block 
+          (rebind var def! global)
+          (cont ↑var)))))
+  global)
+
+;;; SET -- assignment
+(define set
+  (lambda reflect [[var exp] env cont]
+    (normalise exp env
+      (lambda simple [exp!]
+        (block
+          (rebind var exp! env)
+          (cont ''ok))))))
+
+(define macro
+  (lambda simple [def-env pattern body]
+    ((lambda simple [expander]
+       (lambda reflect [args env cont]
+         (normalise (expander . args) env cont)))
+     (simple def-env pattern body))))
+
+(define let
+  (lambda macro [list body]
+    `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
+
+;;;
+;;; Essentials
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Frequently used stuff
+;;;
+
+(define id (lambda simple [x] x))
+
+(define 1+ (lambda simple [n] (+ n 1)))
+(define 1- (lambda simple [n] (- n 1)))
+(define zero (lambda simple [n] (= n 0)))
+
+(define double (lambda simple [vec] (= 2 (length vec))))
+(define 3rd (lambda simple [vec] (nth 3 vec)))
+(define 4th (lambda simple [vec] (nth 4 vec)))
+(define last (lambda simple [vec] (nth (length vec) vec)))
+(define foot (lambda simple [vec] (tail (length vec) vec)))
+
+
+(define number (lambda simple [x] (= (type x) 'number)))
+(define truth-value (lambda simple [x] (= (type x) 'truth-value)))
+(define sequence (lambda simple [x] (= (type x) 'sequence)))
+;(define atom (lambda simple [x] (= (type x) 'atom)))
+;(define rail (lambda simple [x] (= (type x) 'rail)))
+;(define pair (lambda simple [x] (= (type x) 'pair)))
+(define numeral (lambda simple [x] (= (type x) 'numeral)))
+(define boolean (lambda simple [x] (= (type x) 'boolean)))
+(define handle (lambda simple [x] (= (type x) 'handle)))
+(define closure (lambda simple [x] (= (type x) 'closure)))
+(define function (lambda simple [x] (= (type x) 'function)))
+
+
+(define not (lambda simple [b] (if b $F $T)))
+
+; from page 79 of Manual
+(define and 
+  (lambda reflect [args env cont]
+    (if (rail args)
+        (and-helper args env cont)
+        (normalise args env
+          (lambda simple [args!]
+            (and-helper args! env cont))))))
+
+(define and-helper
+  (lambda simple [args env cont]
+    (if (empty args)
+        (cont '$T)
+        (normalise (1st args) env
+          (lambda simple [premise!]
+            (if ↓premise!
+                (and-helper (rest args) env cont)
+                (cont '$F)))))))
+
+; from page 79 of Manual
+(define or 
+  (lambda reflect [args env cont]
+    (if (rail args)
+        (or-helper args env cont)
+        (normalise args env
+          (lambda simple [args!]
+            (or-helper args! env cont))))))
+
+(define or-helper
+  (lambda simple [args env cont]
+    (if (empty args)
+        (cont '$F)
+        (normalise (1st args) env
+          (lambda simple [premise!]
+            (if ↓premise!
+                (cont '$T)
+                (or-helper (rest args) env cont)))))))
+
+(define external
+  (lambda simple [x]
+    (member (type x) ['number 'sequence 'truth-value 'function])))
+
+(define vector-constructor
+  (lambda simple [template]
+    (if (external template) scons rcons)))
+
+(define map
+  (lambda simple args
+    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+          [(double args)
+           (prep ((1st args) (1st (2nd args)))
+                 (map (1st args) (rest (2nd args))))]
+          [$T (prep ((1st args) . (map 1st (rest args)))
+                    (map . (prep (1st args) (map rest (rest args)))))])))
+
+;;;
+;;; Frequently used stuff
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Expertimental stuff
+;;;
+; 
+;(define lambda
+;  (lambda reflect [[kind pattern body] env cont]
+;    (cont (!kind env pattern body))))
+;
+; or rather
+;
+;(define lambda
+;  (lambda reflect [[kind pattern body] env cont]
+;    (normalise kind env
+;      (lambda simple [kind!]
+;        (cont (↓kind! env pattern body))))))
+;   
+;(define simple
+;  (lambda simple [def-env pattern body]
+;    (ccons 'simple def-env pattern body)))
+;
+;(define reflect
+;  (lambda simple [def-env pattern body]
+;    (ccons 'reflect def-env pattern body)))
+
+; 3Lisp Manual version
+;
+;(define lambda
+;  (lambda reflect [[kind pattern body] env cont]
+;    (reduce kind ↑[env pattern body] env cont)))
+;    
+;(define simple
+;  (lambda simple [def-env pattern body]
+;    ↓(ccons 'simple def-env pattern body)))
+;    
+;(define reflect
+;  (lambda simple [def-env pattern body]
+;    ↓(ccons 'reflect def-env pattern body)))
+
+    
