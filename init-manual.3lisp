@@ -13,21 +13,29 @@
 
 ;; To be done: 
 
-; - I/O
-; - shared tail
-; - replace ...
+; [x] ACONS
+; [x] do
+; [x] INTERNALISE and EXTERNALISE: provided primitively. note that the manual takes these to be non-primitive, which is OK 
+;                                  because the STRING type is not primitive, but rather sequence of characters. 
+; [-] I/O: NO support for streams for now. The Manual version has no CONS. It thus does not offer a useful, complete set.
+; [-] ?-ending of boolean functions ... not doing this so as to (i) conform to the manual & (ii) allow charactersitic functions for types
+; [x] REPLACE
+; => [x] REPLACE done for RAIL and PAIR
+; => [-] REPLACE not done for ATOM, because Ruby does not allow change of symbol, while retaining object identity. 
+; => [?] REPLACE could be trivially done for CLOSURE, but what's the point? 
+; [x] - + - * page 46 ...
+; [x] shared tail
 ; [x] string
-; - do
-; - + - * page 46 ...
-; - ?-ending of boolean functions
-; - ACONS
 
 ;; To study:
 
+; - macro
+; - do
+; - slowness of let and possible fix
 ; - select family
 ; - let family
 ; - catch/throw; delay/force
-
+; - Y-operator
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -35,7 +43,7 @@
 ;;
 
 
-;;; DEFEINE
+;;; DEFINE
 (rebind 'define
   ↑(lambda reflect [[var def] env cont]
     (normalise def env 
@@ -84,7 +92,12 @@
   (lambda simple [fun]
     (reflect (environment-designator ↑fun) (pattern ↑fun) (body ↑fun))))
 
-; DEFINE
+; DEFEIN
+
+(define DEFEIN
+  (lambda macro [label form]
+    `(block (set ,label (y-OPERATOR (lambda simple [,label] ,form)))
+            ,↑label)))
 
 ;;; SET -- assignment
 (define SET
@@ -115,11 +128,11 @@
            
 (define LETREC
   (lambda macro [list body]
-    `((lambda simple ,(map 1st list))
+    `((lambda simple ,(map 1st list)
         (block
           (block . ,(map (lambda simple [x] `(set . ,x)) list))
           ,body))
-      . ,(map (lambda simple [x] ''?) list)))
+      . ,(map (lambda simple [x] ''?) list))))
 
 ;;
 ;; Naming and Procedure Definition
@@ -144,7 +157,7 @@
 
 (define DO
   (lambda macro args
-    (let [[loop-name (acons)]                                 ; ACONS is undefined
+    (let [[loop-name (acons)]                                 
           [variables (map 1st (1st args))]
           [init (map 2nd (1st args))]
           [next (map 3rd (1st args))]
@@ -163,7 +176,7 @@
   (lambda macro args
     (letseq [[dummy (acons)]
              [select-helper 
-                (lambda simple [[chioce action]]
+                (lambda simple [[choice action]]
                   (cond [(rail choice)
                          `[(member ,dummy ,choice) ,actino]]
                         [(not (boolean choice))
