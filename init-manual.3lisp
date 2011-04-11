@@ -13,6 +13,7 @@
 
 ;; To be done: 
 
+; [ ] clean up READ, PRINT, PROMPT&READ, PROMPT&REPLY, READ-NORMALISE-PRINT: it seems that levels and prompts should be differentiated, maybe then combined?
 ; [x] ACONS
 ; [x] do
 ; [x] INTERNALISE and EXTERNALISE: provided primitively. note that the manual takes these to be non-primitive, which is OK 
@@ -29,13 +30,17 @@
 
 ;; To study:
 
-; - macro
+; [x] macro
 ; - do
 ; - slowness of let and possible fix
 ; - select family
 ; - let family
-; - catch/throw; delay/force
+; [x] catch/throw; delay/force
 ; - Y-operator
+
+;; To think about
+; prompt&read ... do we need level number? I think NOT.
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -53,6 +58,30 @@
           (cont ↑var)))))
   global)
 
+(define version
+  (lambda simple [] "3Lisp version R00, April 15, 2011"))
+
+(define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
+
+(define EXTERNAL    (lambda simple [x]
+                      (member (type x) 
+                              ['sequence 'number 'truth-value 'function
+                               'bindings])))
+
+(define VECTOR-CONSTRUCTOR
+  (lambda simple [template]
+    (if (external template) scons rcons)))
+
+(define MAP
+  (lambda simple args
+    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+          [(double args)
+           (prep ((1st args) (1st (2nd args)))
+                 (map (1st args) (rest (2nd args))))]
+          [$T (prep ((1st args) . (map 1st (rest args)))
+                    (map . (prep (1st args) (map rest (rest args)))))])))
+
+
 ; LAMBDA
 
 ; SIMPLE 
@@ -66,6 +95,25 @@
        (lambda reflect [args env cont]
          (normalise (expander . args) env cont)))
      (simple def-env pattern body))))
+
+(define LET
+  (lambda macro [list body]
+    `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
+
+(define LETSEQ
+  (lambda macro [list body]
+    (if (empty list)
+        body
+        `(let [,(1st list)]
+           (letseq ,(rest list) ,body)))))
+           
+(define LETREC
+  (lambda macro [list body]
+    `((lambda simple ,(map 1st list)
+        (block
+          (block . ,(map (lambda simple [x] `(set . ,x)) list))
+          ,body))
+      . ,(map (lambda simple [x] ''?) list))))
 
 (define REFLECT!
   (lambda simple [def-env pattern body]
@@ -110,29 +158,10 @@
 
 (define SETREF
   (lambda REFLECT! [[var! binding!] env cont]
-    (block (rebind var binding! env)
+    (block (rebind ↓var! binding! env)
            (cont ''OK))))
 
 ; REBIND is a primitive
-
-(define LET
-  (lambda macro [list body]
-    `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
-
-(define LETSEQ
-  (lambda macro [list body]
-    (if (empty list)
-        body
-        `(let [,(1st list)]
-           (letseq ,(rest list) ,body)))))
-           
-(define LETREC
-  (lambda macro [list body]
-    `((lambda simple ,(map 1st list)
-        (block
-          (block . ,(map (lambda simple [x] `(set . ,x)) list))
-          ,body))
-      . ,(map (lambda simple [x] ''?) list))))
 
 ;;
 ;; Naming and Procedure Definition
@@ -178,7 +207,7 @@
              [select-helper 
                 (lambda simple [[choice action]]
                   (cond [(rail choice)
-                         `[(member ,dummy ,choice) ,actino]]
+                         `[(member ,dummy ,choice) ,action]]
                         [(not (boolean choice))
                          `[(= ,dummy ,choice) ,action ]]
                         [$T `[,choice ,action]]))]]
@@ -187,16 +216,16 @@
 
 (define SELECTQ
   (lambda macro args
-    (letseq [[dummer (acons)]
+    (letseq [[dummy (acons)]
              [selectq-helper
                (lambda simple [[choice action]]
                  (cond [(atom choice)
                         `[(= ,dummy ,↑choice) ,action]]
-                       [(rail chioce)
+                       [(rail choice)
                         `[(member ,dummy ,↑choice) ,action]]
                        [$T `[,choice ,action]]))]]
-      (let [[,dummy ,(1st args)]]
-        (cond . ,(map selectq-helper (rest args)))))))
+      `(let [[,dummy ,(1st args)]]
+          (cond . ,(map selectq-helper (rest args)))))))
         
 (define CATCH
   (lambda reflect [[exp] env cont]
@@ -240,7 +269,6 @@
 (define foot (lambda simple [vector] (tail (length vector) vector)))
 
 ;(define UNIT (lambda simple [vec] (= 1 (length vec))))       ; KU & different from manual
-(define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
 
 ;(define MEMBER                                               ; KU
 ;  (lambda simple [element vector]
@@ -248,15 +276,16 @@
 ;          [(= element (1st vector)) $T]
 ;          [$T (member element (rest vector))])))
 
-; isomorphic to be defined ...
+; isomorphic is primitive for now ...
+
 
 (define INDEX
   (lambda simple [element vector]
     (letrec [[index-helper 
               (lambda simple [vector-tail position]
                 (cond [(empty vector-tail) 0]
-                      [(= (1st vector-tail) element) positino]
-                      [$T (index-helper (rest vector-rail) (1+ position))]))]]
+                      [(= (1st vector-tail) element) position]
+                      [$T (index-helper (rest vector-tail) (1+ position))]))]]
       (index-helper vector 1))))
       
 (define VECTOR-CONSTRUCTOR
@@ -283,8 +312,10 @@
         (prep (1st vector) (copy-vector (rest vector))))))
         
 (define CONCATENATE
-  (lamda simple [rail1 rail2]
-    (replace (foot rail1) rail2)))  ; FOOT is to be implemented 
+  (lambda simple [rail1 rail2]
+    (block
+      (replace (foot rail1) rail2) ; this follows page 40, rather than the code given
+      rail1)))   
 
 (define APPEND
   (lambda simple [vector1 vector2]
@@ -344,7 +375,7 @@
         [[(= i n) a]])))
 
 (define REMAINDER
-  (lamda simple [x y]
+  (lambda simple [x y]
     (- x (* (/ x y) y))))
     
 (define ABS
@@ -368,7 +399,7 @@
   (lambda simple numbers
     (letrec [[min2
                 (lambda simple [x y] (if (< x y) x y))]
-             [min2-helper
+             [min-helper
                 (lambda simple [unseen-numbers minimum]
                   (if (empty unseen-numbers)
                       minimum
@@ -435,7 +466,7 @@
 
 (define MACRO-EXPANDER
   (lambda simple [macro-closure]
-    ↓(binding 'expander (environment ↑macro-closure))))
+    ↓(binding 'expander ↓(environment-designator ↑macro-closure))))
 
 (define ID (lambda simple [x] x))
 

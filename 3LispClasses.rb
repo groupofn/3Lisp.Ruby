@@ -46,7 +46,7 @@ class Object
     return :ENVIRONMENT if self.class == Environment
     return :STRING if self.class == String
     
-    p self.class
+    p self.class; STDOUT.flush
     raise_error(self, "#{self.inspect} is not a 3Lisp structure")
   end
 
@@ -104,25 +104,21 @@ class Object
   end
 
   def atom_d? # atom designator?
-    ref_type == :ATOM
+    handle? && quoted.atom?
   end
 
   def pair_d? # pair designator?
-    ref_type == :PAIR
+    handle? && quoted.pair? # ref_type == :PAIR
   end
  
   def sequence_d? # sequence designator?
-    ref_type == :SEQUENCE
+    rail? # ref_type == :SEQUENCE
   end
 
   def rail_d? # rail designator?
-    ref_type == :RAIL
+    handle? && quoted.rail?
   end
 
-  def string_d? # string designator?
-    ref_type == :TEXT
-  end
- 
   def handle_d? # handle designator?
     ref_type == :HANDLE
   end
@@ -136,6 +132,7 @@ class Object
   end
 
   def normal?
+    return false if struc_type == :STRING
     t = ref_type
     return false if [:ATOM, :PAIR].include?(t)
   	if (t == :RAIL)
@@ -168,18 +165,14 @@ class Object
     case struc_type
     when :NUMERAL, :BOOLEAN, :ENVIRONMENT then return equal?(other)  # external referent
     when :STRING then return equl?(other)
-    when :CLOSURE 
-#      if equal?(other) then return true
-#      else
-        raise_error(self, "equality undefined for closures #{self.to_s} and #{other.to_s}")
-#      end
+    when :CLOSURE then return equal?(other)
     when :HANDLE
       return quoted.eq?(other.quoted) if quoted.handle? # recursive call
       return quoted.equal?(other.quoted)
     when :RAIL
-	  return false if other.struc_type != :RAIL
+	    return false if other.struc_type != :RAIL
       return false if length != other.length
-      zip(other).each{|s,o| return false if !s.equal?(o) }
+      zip(other).each{|dbl| return false if !dbl.first.eq?(dbl.second) }
       return true
     else
       raise_error(self, "equality undefined for #{self.to_s} and #{other.to_s}")
@@ -195,12 +188,15 @@ class Object
   end
 
   def scons(args)
-    Rail.new(args) # should work, just copy the whole Ruby array
+    raise "SCONS expects a sequence; #{args.to_s} is given instead" if !args.sequence_d?
+    args.map{|element|       
+      element
+    }
   end
 
   def rcons(args)
     args.map{|element| 
-      raise "RCONS expects structure; #{element.to_s} is given instead" if !element.handle?
+      raise "RCONS expects structure but was given #{element.to_s}" if !element.handle?
       
       element.down
     }.up
@@ -216,7 +212,7 @@ class Object
       return self.car.isomorphic(other.car) && self.cdr.isomorphic(other.cdr)
     when :RAIL
       return false if length != other.length
-      self.zip(other).each {|s, o| return false if !s.isomorphic(o)}
+      self.zip(other).each {|dbl| return false if !dbl.first.isomorphic(dbl.second)}
       return true
     when :HANDLE
       return self.down.isomorphic(other.down)
@@ -224,7 +220,7 @@ class Object
       return self.type == other.type &&
              self.pattern.isomorphic(other.pattern) &&
              self.body.isomorphic(other.body) &&
-             self.environment.similar(other.environment)
+             self.environment.similar?(other.environment)
     end    
     return false
   end
@@ -241,28 +237,48 @@ class Closure
     @type, @environment, @pattern, @body = type, environment, pattern, body
   end
   
+  def replace(type, environment, pattern, body)
+    @type, @environment, @pattern, @body = type, environment, pattern, body
+  end
+ 
+  def type_d
+    @type.up
+  end
+
+  def environment_d
+    @environment.up
+  end
+  
+  def pattern_d
+    @pattern.up
+  end
+  
+  def body_d
+    @body.up
+  end
+           
   def simple?
-    @type == :SIMPLE.up 
+    @type == :SIMPLE 
   end
   
   def reflective?
-    @type == :REFLECT.up
+    @type == :REFLECT
   end
   
   def de_reflect
-    Closure.new(:SIMPLE.up, @environment, @pattern, @body)
+    Closure.new(:SIMPLE, @environment, @pattern, @body)
   end
   
   def similar?(template)
     return true if self.equal?(template)
-    return @pattern.isomorphic(template.pattern) &&
-           @body.isomorphic(template.body) &&
-           reflective? == template.reflective? && 
-           @environment.similar(template.environment)
+    return pattern.isomorphic(template.pattern) &&
+           body.isomorphic(template.body) &&
+           type == template.type && 
+           environment.similar?(template.environment)
   end
   
   def to_s
-    "{Closure: " + type.to_s + " " + environment.to_s + " " + pattern.to_s + " " + body.to_s + "}"
+    "{Closure: " + @type.to_s + " " + @environment.to_s + " " + @pattern.to_s + " " + @body.to_s + "}"
   end
 end
 # END Closure
@@ -299,8 +315,9 @@ class Handle
     @quoted = struc
   end
 
-  def to_s
-    "'" + @quoted.to_s
+  def to_s    
+#    p self.object_id
+     "'" + @quoted.to_s
   end
 
   # maybe both of the following should be defined in terms of eq?  
@@ -352,7 +369,8 @@ class Handle
   end
   
   def empty?
-    length == 0
+    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
+    quoted.empty?
   end
 
   def nth(n)
@@ -370,6 +388,10 @@ class Handle
   
   def third
     nth(3)
+  end
+
+  def fourth
+    nth(4)
   end
   
   def tail(n)
@@ -399,41 +421,106 @@ class Handle
     raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
     raise_error(self, "#{t} must be a handle") if !t.handle?
     quoted.rplact(n, t.down).up
-  end  
+  end
+  
+  def rplacc(c)
+    quoted.replace(c.quoted.type, c.quoted.environment, c.quoted.pattern, c.quoted.body).up 
+  end
 end
 #### END Handle
 
 #### BEGIN Rail & Sequence implementation  
-class Rail < Array
+class Rail
   include ThreeLispError
 
-  def map(*args)
-    Rail.new(super(*args))
+  attr_accessor :element, :remaining
+
+  def initialize(*args)
+    if args.size == 0 
+      @element = nil
+      @remaining = nil
+    else
+      @element = args[0]
+      @remaining = Rail.new(*args[1..-1])
+    end
   end
   
-  def to_s
-    return "[]" if empty?
+  def empty?
+    element == nil # && @rest == nil
+  end
 
-    # "join" can't handle recursion appropriately
-    inject("[") do |str, element|
-        str + element.to_s + " "
-    end.chop << "]"
+  def length
+    return 0 if element.nil?
+    return remaining.length + 1
+  end
+
+  def to_s
+    "[" + element.to_s + (element.nil? ? "" : remaining.r_to_s) + "]"
+  end
+  
+  def r_to_s
+    element.nil? ? "" : " " + element.to_s + remaining.r_to_s
+  end
+
+  def self.array2rail(arr)
+    r = Rail.new
+    t = r
+    for i in 0..arr.length
+      t.element = arr[i]
+      t.remaining = Rail.new
+      t = t.remaining
+    end
+    return r
+  end
+
+  def prep(e)
+    r = Rail.new(e)
+    r.remaining = self
+    return r
+  end
+
+  def map(&block)
+    if element.nil?
+      Rail.new
+    else
+      e = block.call(element)
+      remaining.map(&block).prep(e) 
+    end
+  end
+  
+  def each(&block)
+    if !element.nil?
+      block.call(@element)
+      remaining.each(&block)
+    end
+  end
+  
+  def zip(other_rail)
+    if element.nil?
+      Rail.new
+    else
+      e = Rail.new(self.element, other_rail.element)
+      remaining.zip(other_rail.remaining).prep(e)
+    end
   end
   
   def down
-    map { |element| 
+    map { |e| 
       raise_error(self, 
-        "#{self.inspect} must be sequence of S-expression") if !element.handle?
-      element.down 
+        "structure expected; #{self.to_s} given") if !e.handle?
+      e.down
     } 
   end
 
-  # length and empty? are inherited from Array
-  # cannot rely on Ruby for checking bounds
-  # because a[a.length] => nil, which is an object in Rub!
   def nth(n)
-    raise_error(self, "#{n} is out of bound") if n > length
-    self[n-1]
+    if n < 1 then raise_error(self, "NTH: index is out of bound")
+    elsif n == 1
+      raise_error(self, "NTH: index is out of bound") if element.nil?
+      return element
+    else # n > 1
+      raise_error(self, "NTH: index is out of bound") if element.nil?
+      return remaining.nth(n-1)
+    end
   end
  
   def first
@@ -448,27 +535,75 @@ class Rail < Array
     nth(3)
   end
   
+  def fourth
+    nth(4)
+  end
+  
   def tail(n)
-    raise_error(self, "#{n} is out of bound") if n > length
-    self[n..-1]
+    if n < 0 then raise_error(self, "TAIL: index is out of bound")
+    elsif n == 0 then 
+      return self
+    else # n > 0 
+      raise_error(self, "TAIL: index is out of bound") if element == nil
+      return remaining.tail(n-1)
+    end
   end
   
   def rest
     tail(1)
   end
 
-  def prep(e)
-    Rail.new([e] + self)
-  end  
- 
   def rplacn(n, e)
-    self[n-1] = e
+    if n < 1 then raise_error(self, "RPLACN: index is out of bound")
+    elsif n == 1
+       self.element = e
+       return Handle.new(:OK)
+    else # n > 1
+      raise_error(self, "RPLACN: index is out of bound") if element.nil?
+      return remaining.rplacn(n-1, e)
+    end
   end
 
   def rplact(n, t)
-    slice!(n..-1)
-    concat(t)
-    tail(n) # returned
+    if n < 0 || n > length
+      raise_error(self, "RPLACT: index is out of bound")
+    elsif n == 0
+      @element = t.element
+      @remaining = t.remaining
+      return self
+    else
+      tail(n-1).remaining = t # returned
+    end
+  end
+
+  def push(e)
+    r = remaining
+    old_top = element
+    @element = e
+    @remaining = Rail.new
+    @remaining.element = old_top
+    @remaining.remaining = r 
+  end
+  
+  def pop
+    raise_error(self, "POP: attempt to pop from empty rail") if empty?
+    old_top = element
+    @element = remaining.element
+    @remaining = remaining.remaining
+    return old_top
+  end
+  
+  def append!(e)
+    t = tail(length)
+    t.element = e
+    t.remaining = Rail.new
+    return self
+  end
+  
+  def join(r)
+    t = tail(length-1)
+    t.remaining = r
+    self
   end
 end
 #### END Rail
@@ -485,18 +620,18 @@ class Environment
     @local, @tail = local, tail
   end
   
-;  def to_s
-;    "#<#{self.class.to_s}:#{object_id}>"  
-;  end
+  def to_s
+    "#<#{self.class.to_s}:#{object_id}>"  
+  end
 
   def empty?
     (local.nil? || local.empty?) && (tail.nil? || tail.empty?)
   end
 
   def bound_atoms
-    return scons if empty?
-    return scons(@local.keys) if tail.nil? || tail.empty?
-    return scons(@local.keys) + @tail.bound_atoms
+    return Rail.new if empty?
+    return Rail.array2rail(@local.keys) if tail.nil? || tail.empty?
+    return Rail.array2rail(@local.keys).join(@tail.bound_atoms)
   end
   
   def var_is_bound?(var)
@@ -528,25 +663,25 @@ class Environment
   def bind_one(var, arg)
     raise_error(self, "atom expected; #{var.inspect} found") unless var.atom_d?
     @local[var] = arg if !bind_one_helper(var, arg)
+    arg
   end
 
   protected
   def bind_one_helper(var, arg)
     if @local.key?(var)
-	  @local[var] = arg
-	  return true
-	elsif @tail.nil? || @tail.empty?
-	  return false
-	else
-	  @tail.bind_one_helper(var, arg)
-	end
+  	  @local[var] = arg
+	    return true
+	  elsif @tail.nil? || @tail.empty?
+	    return false
+	  else
+	    @tail.bind_one_helper(var, arg)
+	  end
   end
 
   public
   # note that this returns an extended environment 
   def bind_pattern(pattern, args)
     new_bindings = bind_pattern_helper({}, pattern, args)
-    raise_error(self, "#{pattern} and #{args} must match") if new_bindings.nil?
 	
     Environment.new(new_bindings, self)	
   end
@@ -567,11 +702,12 @@ class Environment
         end
       end
 
-      if !pattern.sequence_d? || !args.sequence_d? || pattern.length != args.length
-        return nil
-      end
-      
-      pattern.zip(args).each{|pat, arg| bind_pattern_helper(newbindings, pat, arg) }  
+      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
+      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
+      raise_error(self, "too many arguments") if args.length > pattern.length
+      raise_error(self, "too few arguments") if args.length < pattern.length
+
+      pattern.zip(args).each{|dbl| bind_pattern_helper(newbindings, dbl.first, dbl.second) }  
     end 
 
     newbindings
@@ -598,7 +734,7 @@ class Environment
   end
   
   public
-  def similar(template)  # see page 277 of Implementation paper
+  def similar?(template)  # see page 277 of Implementation paper
     return true if self.equal?(template)
     self_keys = @local.keys
     template_keys = template.local.keys
@@ -611,7 +747,7 @@ class Environment
       end
     }
 	return true if @tail.empty? && template.tail.empty?
-	@tail.similar(template.tail)
+	@tail.similar?(template.tail)
   end
 end
 # END Environment
@@ -622,141 +758,264 @@ end
 #end
 
 def ruby_lambda_for_primitive(closure)
-  PRIMITIVES.assoc(closure.body.down)[3]
+  PRIMITIVES.assoc(closure.body)[3]
 end
 
 PRIMITIVES = [
-  [:EXIT, :SIMPLE, Rail.new([]), lambda {|args| Process.exit }],
-  [:ERROR, :SIMPLE, Rail.new([:struc]), lambda{|args|
-    raise_error(self, "3-Lisp run-time error: " + args[0].to_s + "\n") }],
+  [:EXIT, :SIMPLE, Rail.new, lambda {|args| Process.exit }],
+  [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
+    raise_error(self, "3-Lisp run-time error: " + args.first.to_s + "\n") }],
   [:READ, :SIMPLE, :args, lambda{|args|
-    raise_error(self, "READ expects a handle but was given #{args[0].to_s}") if !args[0].handle?
+    raise_error(self, "READ expects a structure but was given #{args.first.to_s}") if !args.first.handle?
     code = nil
     while code.nil?
-      print args[0].down.to_s + " " if !args.empty?   # args[0].handle?
-      code = $parser.parse($reader.read)[0]
+      print args.first.down.to_s + " " if !args.empty?   # args.first.handle?
+      parsed = $parser.parse($reader.read)
+      next if parsed.empty?
+      code = parsed.first
     end
     code.up }],
-  [:PRINT, :SIMPLE, Rail.new([:struc]), lambda{|args|
-    raise_error(self, "PRINT expects a handle but was given #{args[0].to_s}") if !args[0].handle?    
-    print args[0].down.to_s + " " }],
-  [:TERPRI, :SIMPLE, Rail.new([]), lambda{|args| print "\n" }],
+  [:PRINT, :SIMPLE, Rail.new(:struc), lambda{|args|
+    if args.first.string?
+      print args.first
+    else
+      raise_error(self, "PRINT expects a structure but was given #{args.first.to_s}") if !args.first.handle?    
+      print args.first.down.to_s + " "
+    end
+    Handle.new(:OK)}],
+  [:TERPRI, :SIMPLE, Rail.new, lambda{|args| print "\n"; Handle.new(:OK) }],
+  [:INTERNALISE, :SIMPLE, Rail.new(:string), lambda{|args|
+    parsed = $parser.parse(args.first)
+    raise_error(self, "Failed to internalise string: #{args.first}") if parsed.empty?
+    struc = parsed.first.up
+  }],
+  [:EXTERNALISE, :SIMPLE, Rail.new(:struc), lambda{|args|
+    raise_error(self, "Externalise expects a handle but was given #{args.first.to_s}") if !args.first.handle?    
+    args.first.down.to_s  
+  }],
   
-  [:TYPE, :SIMPLE, Rail.new([:struc]), lambda{|args| args[0].ref_type.up }],
-  [:UP, :SIMPLE, :args, lambda{|args| args[0].up }],
-  [:DOWN, :SIMPLE, :args, lambda{|args|
-    raise_error(self, "DOWN expects a handle but was given #{args[0].to_s}") if !args[0].handle?
-    result = args[0].down
-    raise_error(self, "DOWN expects a normal form designator but was given #{args[0].to_s}") if !result.normal? 
+  [:TYPE, :SIMPLE, Rail.new(:struc), lambda{|args| args.first.ref_type.up }],
+  [:UP, :SIMPLE, Rail.new(:struc), lambda{|args| args.first.up }],
+  [:DOWN, :SIMPLE, Rail.new(:struc), lambda{|args|
+    raise_error(self, "DOWN expects a structure but was given #{args.first.to_s}") if !args.first.handle?
+    result = args.first.down
     return result }],
-  [:"=", :SIMPLE, Rail.new([:struc1, :struc2]), lambda{|args| args[0].eq?(args[1]) }],
+  [:REPLACE, :SIMPLE, Rail.new(:struc1, :struc2), lambda{|args|
+    s1_rt = args.first.ref_type; s2_rt = args.second.ref_type
+    raise_error(self, "REPLACE expects structures of the same type") if s1_rt != s2_rt
+    raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
+    case s1_rt
+    when :RAIL
+      args.first.rplact(0, args.second.tail(0))
+    when :PAIR
+      args.first.rplaca(args.second.car)
+      args.first.rplacd(args.second.cdr)
+    when :CLOSURE
+      args.first.rplacc(args.second)
+    end
+    return Handle.new(:OK) }],
+  [:"=", :SIMPLE, :args, lambda{|args|
+    raise_error(self, "= expects at least 2 arguments") if args.length < 2
+    
+    first = args.first; rest = args.rest;
+    while !rest.empty?
+      second = rest.first
+      if first.eq?(second)
+        first = second
+        rest = rest.rest
+      else
+        raise_error(self, "= not generally defined over functions") if first.closure? && second.closure?
+        return false
+      end
+    end  
+    return true }],
+
+  [:ISOMORPHIC, :SIMPLE, Rail.new(:e1, :e2), lambda{|args|
+    raise_error(self, "ISOMORPHIC expects 2 arguments") if args.length != 2
+    args.first.isomorphic(args.second) }],
+
+  [:ACONS, :SIMPLE, :args, lambda{|args|
+    begin
+      s = "3LispAtom" + Time.now.to_f.to_s + rand(0x3fffffff).to_s 
+    end while !$STRINGS_used_by_ACONS[s].nil?
+    
+    $STRINGS_used_by_ACONS[s] = s.to_sym.up # returned
+  }],
 
   [:SCONS, :SIMPLE, :args, lambda{|args| scons(args) }], 
   [:RCONS, :SIMPLE, :args, lambda{|args| rcons(args) }], 
-  [:LENGTH, :SIMPLE, Rail.new([:vec]), lambda{|args|
-    raise_error(self, "LENGTH expects a rail or rail designator but was given #{args[0].to_s}") if !args[0].rail? && !args[0].rail_d?
-    args[0].length }],
-  [:NTH, :SIMPLE, Rail.new([:n, :vec]), lambda{|args|
-    raise_error(self, "NTH expects a rail or rail designator but was given #{args[1].to_s}") if !args[1].rail? && !args[1].rail_d?
-    raise_error(self, "NTH expects a numeral but was given #{args[0].to_s}") if !args[0].numeral?
-    args[1].nth(args[0]) }],
-  [:TAIL, :SIMPLE, Rail.new([:n, :vec]), lambda{|args| 
-    raise_error(self, "TAIL expects a rail or rail designator but was given #{args[1].to_s}") if !args[1].rail? && !args[1].rail_d?
-    raise_error(self, "TAIL expects a numeral but was given #{args[0].to_s}") if !args[0].numeral?
-    args[1].tail(args[0]) }],
-  [:PREP, :SIMPLE, Rail.new([:struc, :vec]), lambda{|args| 
-    raise_error(self, "PREP expects a rail or rail designator but was given #{args[1].to_s}") if !args[1].rail? && !args[1].rail_d?
-    args[1].prep(args[0]) }], 
+  [:EMPTY, :SIMPLE, Rail.new(:vec), lambda{|args|
+    raise_error(self, "EMPTY expects a vector but was given #{args.first.to_s}") if !args.first.rail? && !args.first.rail_d?
+    args.first.empty? }],
+  [:LENGTH, :SIMPLE, Rail.new(:vec), lambda{|args|
+    raise_error(self, "LENGTH expects a vector but was given #{args.first.to_s}") if !args.first.rail? && !args.first.rail_d?
+    args.first.length }],
+  [:NTH, :SIMPLE, Rail.new(:n, :vec), lambda{|args|
+    raise_error(self, "NTH expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
+    raise_error(self, "NTH expects a number but was given #{args.first.to_s}") if !args.first.numeral?
+    args.second.nth(args.first) }],
+  [:TAIL, :SIMPLE, Rail.new(:n, :vec), lambda{|args| 
+    raise_error(self, "TAIL expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
+    raise_error(self, "TAIL expects a number but was given #{args.first.to_s}") if !args.first.numeral?
+    args.second.tail(args.first) }],
+  [:PREP, :SIMPLE, Rail.new(:struc, :vec), lambda{|args| 
+    raise_error(self, "PREP expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
+    raise_error(self, "PREP expects a structure but was given #{args.first.to_s}") if args.second.rail_d? && !args.first.handle?
+    args.second.prep(args.first) }], 
     
     # 3-Lisp Manual has "REPLACE"!
-  [:RPLACN, :SIMPLE, Rail.new([:n, :vec, :struc]), lambda{|args| 
-    raise_error(self, "RPLACN expects rail or rail designator but was given #{args[1].to_s}") if !args[1].rail? && !args[1].rail_d?
-    raise_error(self, "RPLACN expects rail or rail designator but was given #{args[2].to_s}") if !args[2].rail? && !args[2].rail_d?
-    raise_error(self, "RPLACN expects a numeral but was given #{args[0].to_s}") if !args[0].numeral?
-    args[1].rplacn(args[0], args[2]) }],
-  [:RPLACT, :SIMPLE, Rail.new([:n, :vec, :tail]), lambda{|args| 
-    raise_error(self, "RPLACT expects rail or rail designator but was given #{args[1].to_s}") if !args[1].rail? && !args[1].rail_d?
-    raise_error(self, "RPLACN expects rail or rail designator but was given #{args[2].to_s}") if !args[2].rail? && !args[2].rail_d?
-    raise_error(self, "RPLACT expects a numeral but was given #{args[0].to_s}") if !args[0].numeral?
-    args[1].rplact(args[0], args[2]) }],
+  [:RPLACN, :SIMPLE, Rail.new(:n, :vec, :struc), lambda{|args| 
+    raise_error(self, "RPLACN expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
+    raise_error(self, "RPLACN expects a structure but was given #{args.third.to_s}") if !args.third.handle?
+    raise_error(self, "RPLACN expects a number but was given #{args.first.to_s}") if !args.first.numeral?
+    args.second.rplacn(args.first, args.third) }],
+  [:RPLACT, :SIMPLE, Rail.new(:n, :vec, :tail), lambda{|args| 
+    raise_error(self, "RPLACT expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
+    raise_error(self, "RPLACN expects a vector but was given #{args.third.to_s}") if !args.third.rail? && !args.third.rail_d?
+    raise_error(self, "RPLACT expects a number but was given #{args.first.to_s}") if !args.first.numeral?
+    args.second.rplact(args.first, args.third) }],
 
-  [:PCONS, :SIMPLE, Rail.new([:car, :cdr]), lambda{|args| pcons(args[0], args[1]) }],
-    
-  [:CAR, :SIMPLE, Rail.new([:pair]), lambda{|args| 
-    raise_error(self, "CAR expects a pair designator but was given #{args[0].to_s}") if !args[0].pair_d?
-    args[0].car }],
-  [:CDR, :SIMPLE, Rail.new([:pair]), lambda{|args| 
-    raise_error(self, "CDR expects a pair designator but was given #{args[0].to_s}") if !args[0].pair_d?
-    args[0].cdr }], 
-  [:RPLACA, :SIMPLE, Rail.new([:pair, :new_car]), lambda{|args| 
-    raise_error(self, "RPLACA expects a pair designator but was given #{args[0].to_s}") if !args[0].pair_d?
-    raise_error(self, "RPLACA expects a handle but was given #{args[1].to_s}") if !args[1].pair_d?
-    args[0].rplaca(args[1]) }],
-  [:RPLACD, :SIMPLE, Rail.new([:pair, :new_cdr]), lambda{|args| 
-    raise_error(self, "RPLACD expects a pair designator but was given #{args[0].to_s}") if !args[0].pair_d?
-    raise_error(self, "RPLACD expects a handle but was given #{args[1].to_s}") if !args[1].pair_d?
-    args[0].rplacd(args[1]) }],
+  [:PCONS, :SIMPLE, Rail.new([:car, :cdr]), lambda{|args| 
+    raise_error(self, "PCONS expects structure but was given #{args.first.to_s}") if !args.first.handle?
+    raise_error(self, "PCONS expects structure but was given #{args.second.to_s}") if !args.second.handle?
+    pcons(args.first, args.second) }],
+  [:CAR, :SIMPLE, Rail.new(:pair), lambda{|args| 
+    raise_error(self, "CAR expects a pair but was given #{args.first.to_s}") if !args.first.pair_d?
+    args.first.car }],
+  [:CDR, :SIMPLE, Rail.new(:pair), lambda{|args| 
+    raise_error(self, "CDR expects a pair but was given #{args.first.to_s}") if !args.first.pair_d?
+    args.first.cdr }], 
+  [:RPLACA, :SIMPLE, Rail.new(:pair, :new_car), lambda{|args| 
+    raise_error(self, "RPLACA expects a pair but was given #{args.first.to_s}") if !args.first.pair_d?
+    raise_error(self, "RPLACA expects a structure but was given #{args.second.to_s}") if !args.second.handle?
+    args.first.rplaca(args.second) }],
+  [:RPLACD, :SIMPLE, Rail.new(:pair, :new_cdr), lambda{|args| 
+    raise_error(self, "RPLACD expects a pair but was given #{args.first.to_s}") if !args.first.pair_d?
+    raise_error(self, "RPLACD expects a structure but was given #{args.second.to_s}") if !args.second.handle?
+    args.first.rplacd(args.second) }],
 
-  [:">", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args| 
-    raise_error(self, "> expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] > args[1] }], 
-  [:"<", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args|
-    raise_error(self, "< expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] < args[1] }], 
-  [:"+", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args|
-    raise_error(self, "+ expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] + args[1] }], 
-  [:"-", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args|
-    raise_error(self, "- expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] - args[1] }], 
-  [:"*", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args|
-    raise_error(self, "* expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] * args[1] }], 
-  [:"/", :SIMPLE, Rail.new([:"n1", :"n2"]), lambda{|args|
-    raise_error(self, "/ expects numerals but was given #{args[0].inspect} and #{args[1].to_s}") if !args[0].numeral? || !args[1].numeral?
-    args[0] / args[1] }],
+  [:">", :SIMPLE, :numbers, lambda{|args|
+    raise_error(self, "> expects at least two numbers") if args.length < 2
+    args.each {|e|
+      raise_error(self, "> expects numbers but was given #{e.to_s}") if !e.numeral?
+    }    
+    previous = args.first
+    args.rest.each {|current|
+      return false if !(previous > current)
+      previous = current
+    }    
+    true }],
+  [:">=", :SIMPLE, :numbers, lambda{|args|
+    raise_error(self, ">= expects at least two numbers") if args.length < 2
+    args.each {|e|
+      raise_error(self, "> expects numbers but was given #{e.to_s}") if !e.numeral?
+    }    
+    previous = args.first
+    args.rest.each {|current|
+      return false if !(previous >= current)
+      previous = current
+    }    
+    true }],
+  [:"<", :SIMPLE, :numbers, lambda{|args|
+    raise_error(self, "< expects at least two numbers") if args.length < 2
+    args.each {|e|
+      raise_error(self, "> expects numbers but was given #{e.to_s}") if !e.numeral?
+    }    
+    previous = args.first
+    args.rest.each {|current|
+      return false if !(previous < current)
+      previous = current
+    }    
+    true }],
+  [:"<=", :SIMPLE, :numbers, lambda{|args|
+    raise_error(self, "<= expects at least two numbers") if args.length < 2
+    args.each {|e|
+      raise_error(self, "> expects numbers but was given #{e.to_s}") if !e.numeral?
+    }    
+    previous = args.first
+    args.rest.each {|current|
+      return false if !(previous <= current)
+      previous = current
+    }    
+    true }],
+  [:"+", :SIMPLE, :numbers, lambda{|args|
+    sum = 0;
+    args.each {|n|  
+      raise_error(self, "+ expects numbers but was given #{n.to_s}") if !n.numeral?
+      sum += n
+    }
+    sum}], 
+  [:"-", :SIMPLE, :numbers, lambda{|args|  # this implementation combines subtraction and minus (i.e. sign-flip)
+    raise_error(self, "- expects at least one number") if args.empty?
+    diff = args.first;
+    raise_error(self, "- expects numbers but was given #{diff.to_s}") if !diff.numeral?
+    return -diff if args.length == 1
+
+    args.rest.each {|n|  
+      raise_error(self, "- expects numbers but was given #{n.to_s}") if !n.numeral?
+      diff -= n
+    }
+    diff}], 
+  [:"*", :SIMPLE, :numbers, lambda{|args|
+    product = 1;
+    args.each {|n|  
+      raise_error(self, "* expects numbers but was given #{n.to_s}") if !n.numeral?
+      product *= n
+    }
+    product}], 
+  [:"/", :SIMPLE, Rail.new(:"n1", :"n2"), lambda{|args|
+    raise_error(self, "/ expects numbers but was given #{args.first.inspect} and #{args.second.to_s}") if !args.first.numeral? || !args.second.numeral?
+    args.first / args.second }],
   
-  [:EF, :SIMPLE, Rail.new([:premise, :"clause1", :"clause2"]), lambda{|args|
-    raise_error(self, "EF expects a boolean but was given #{args[0].to_s}") if !args[0].boolean?
-    args[0] ? args[1] : args[2] }], 
+  [:EF, :SIMPLE, Rail.new(:premise, :"clause1", :"clause2"), lambda{|args|
+    raise_error(self, "EF expects a truth value but was given #{args.first.to_s}") if !args.first.boolean?
+    args.first ? args.second : args.third }], 
 
-  [:CCONS, :SIMPLE, Rail.new([:type, :env, :pattern, :body]).up, lambda{|args| 
-    raise_error(self, "CCONS expects a procedure type designator but was given #{args[0].to_s}") if (args[0] != :SIMPLE.up) && (args[0] != :REFLECT.up)
-    raise_error(self, "CCONS expects an environment but was given #{args[1].to_s}") if !args[1].environment?
-#    raise_error(self, "CCONS expects a pattern designator but was given #{args[2].to_s}") if !args[2].rail_d?
-    raise_error(self, "CCONS expects expression designator but was given #{args[3].to_s}") if !args[3].handle?
-    Closure.new(args[0], args[1], args[2], args[3]).up }],
-  [:BODY, :SIMPLE, Rail.new([:closure]), lambda{|args| args[0].down.body }],
-  [:ENVIRONMENT, :SIMPLE, Rail.new([:closure]), lambda{|args| args[0].down.environment }],
-  [:PATTERN, :SIMPLE, Rail.new([:closure]), lambda{|args| args[0].down.pattern  }],
-  [:"PROCEDURE-TYPE", :SIMPLE, Rail.new([:closure]), lambda{|args| args[0].down.type }],
+  [:CCONS, :SIMPLE, Rail.new(:type, :env, :pattern, :body), lambda{|args|
+#    raise_error(self, "CCONS expects a procedure type but was given #{args.first.to_s}") if (args.first != :SIMPLE.up) && (args.first != :REFLECT.up)
+#    raise_error(self, "CCONS expects an environment but was given #{args.second.to_s}") if !args.second.environment?
+#    raise_error(self, "CCONS expects a pattern designator but was given #{args.third.to_s}") if !args.third.rail_d?
+#    raise_error(self, "CCONS expects a structure but was given #{args.fourth.to_s}") if !args.fourth.handle?
+    Closure.new(args.first.down, args.second.down, args.third.down, args.fourth.down).up }],
+  [:BODY, :SIMPLE, Rail.new(:closure), lambda{|args| 
+    raise_error(self, "BODY expects a closure.") if !args.first.closure_d?
+    args.first.down.body.up }],
+  [:"ENVIRONMENT-DESIGNATOR", :SIMPLE, Rail.new(:closure), lambda{|args| 
+    raise_error(self, "ENVIRONMENT-DESIGNATOR expects a closure.") if !args.first.closure_d?
+    args.first.down.environment.up }],
+  [:PATTERN, :SIMPLE, Rail.new(:closure), lambda{|args| 
+    raise_error(self, "PATTERN expects a closure.") if !args.first.closure_d?
+    args.first.down.pattern.up  }],
+  [:"PROCEDURE-TYPE", :SIMPLE, Rail.new(:closure), lambda{|args| 
+    raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
+    args.first.down.type.up }],
   
-  [:ECONS, :SIMPLE, Rail.new([:env]), lambda{|args| 
-    args.empty? ? Environment.new({}, {}) : Environment.new({}, args[0]) }],
+  [:ECONS, :SIMPLE, Rail.new(:env), lambda{|args| 
+    args.empty? ? Environment.new({}, {}) : Environment.new({}, args.first) }],
   # handles expected for the follwing three, thus no ".up"
-  [:BINDING, :SIMPLE, Rail.new([:var, :env]), lambda{|args| 
-    raise_error(self, "BINDING expects an atom designator but was given #{args[0].to_s}") if !args[0].atom_d?
-    raise_error(self, "BINDING expects an environment but was given #{args[1].to_s}") if !args[1].environment?
-    args[1].binding(args[0]) }],
-  [:BIND, :SIMPLE, Rail.new([:pat, :bindings, :env]), lambda{|args|
-#    raise_error(self, "BIND expects an pattern designator but was given #{args[0].to_s}") if !args[0].rail_d?
-    raise_error(self, "BIND expects bindings to be in normal form but was given #{args[1].to_s}") if !args[1].normal?
-    raise_error(self, "BIND expects an environment but was given #{args[2].to_s}") if !args[2].environment?
-    args[2].bind_pattern(args[0], args[1]) }],
-  [:REBIND, :SIMPLE, Rail.new([:var, :binding, :env]), lambda{|args|
-    raise_error(self, "REBIND expects an atom designator but was given #{args[0].to_s}") if !args[0].atom_d?
-    raise_error(self, "REBIND expects bindings to be in normal form but was given #{args[1].to_s}") if !args[1].normal?
-    raise_error(self, "REBIND expects an environment but was given #{args[2].to_s}") if !args[2].environment?
-    args[2].bind_one(args[0], args[1]) }],
-  [:BOUND, :SIMPLE, Rail.new([:var, :env]), lambda{|args|
-    raise_error(self, "BOUND expects an atom designator but was given #{args[0].to_s}") if !args[0].atom_d?
-    raise_error(self, "BOUND expects an environment but was given #{args[1].to_s}") if !args[1].environment?
-    args[1].var_is_bound?(args[0]) }],
-  [:"BOUND-ATOMS", :SIMPLE, Rail.new([:env]), lambda{|args|
-    raise_error(self, "BOUND expects an environment but was given #{args[0].to_s}") if !args[0].environment?
-    args[0].bound_atoms }], # returns a sequence of atom designators
-  [:"SIMILAR-ENVIRONMENT", :SIMPLE, Rail.new([:env1, :env2]), lambda{|args|
-      args[0].similar(args[1]) }] # this one no longer needs to be a primitive!
+  [:BINDING, :SIMPLE, Rail.new(:var, :env), lambda{|args| 
+    raise_error(self, "BINDING expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
+    raise_error(self, "BINDING expects an environment but was given #{args.second.to_s}") if !args.second.environment?
+    args.second.binding(args.first) }],
+  [:BIND, :SIMPLE, Rail.new(:pat, :bindings, :env), lambda{|args|
+#    raise_error(self, "BIND expects an pattern designator but was given #{args.first.to_s}") if !args.first.rail_d?
+    raise_error(self, "BIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
+    raise_error(self, "BIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
+    args.third.bind_pattern(args.first, args.second) }],
+  [:REBIND, :SIMPLE, Rail.new(:var, :binding, :env), lambda{|args|
+    raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
+    raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
+    raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
+    args.third.bind_one(args.first, args.second) }],
+  [:BOUND, :SIMPLE, Rail.new(:var, :env), lambda{|args|
+    raise_error(self, "BOUND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
+    raise_error(self, "BOUND expects an environment but was given #{args.second.to_s}") if !args.second.environment?
+    args.second.var_is_bound?(args.first) }],
+  [:"BOUND-ATOMS", :SIMPLE, Rail.new(:env), lambda{|args|
+    raise_error(self, "BOUND expects an environment but was given #{args.first.to_s}") if !args.first.environment?
+    args.first.bound_atoms }], # returns a sequence of atom designators
+  [:"SIMILAR-ENVIRONMENT", :SIMPLE, Rail.new(:env1, :env2), lambda{|args|
+      args.first.similar?(args.second) }] # this one no longer needs to be a primitive!
 ]
 
 PRIMITIVE_PROC_NAMES = PRIMITIVES.map { |primitive| primitive[0].up }

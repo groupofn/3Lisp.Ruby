@@ -8,6 +8,8 @@ require './3LispInternaliser.rb'
 require './3LispReader.rb'
 require './3LispClasses.rb'
 
+$STRINGS_used_by_ACONS = {}
+
 $parser = ThreeLispInternaliser.new
 $reader = ExpReader.new
 
@@ -16,7 +18,7 @@ primitive_bindings = {}
 PRIMITIVES.map { |primitive| 
   # these are circular closures: quoted atoms used as the body
   primitive_bindings[primitive[0].up] =
-    Closure.new(primitive[1].up, nil, primitive[2].up, primitive[0].up).up # defining env is empty
+    Closure.new(primitive[1], nil, primitive[2], primitive[0]).up # defining env is empty
 }
 
 $global_env = Environment.new(primitive_bindings, {}) # tail env is empty!
@@ -24,19 +26,21 @@ $global_env = Environment.new(primitive_bindings, {}) # tail env is empty!
 PRIMITIVE_CLOSURES = PRIMITIVE_PROC_NAMES.map {|var| $global_env.binding(var) }
 PRIMITIVE_PROCS = PRIMITIVE_CLOSURES.map {|c| c.down }
 
+
 def primitive?(closure)
   PRIMITIVE_PROCS.include?(closure)
 end  
 
-$global_env.bind_one(:"PRIMITIVE-CLOSURES".up, Rail.new(PRIMITIVE_CLOSURES).up)
+$global_env.bind_one(:"PRIMITIVE-CLOSURES".up, Rail.new(*PRIMITIVE_CLOSURES).up)
 
 def initial_tower(level)
-  Rail.new([level])
+  [level]
 end
 
 def shift_down(continuation, state)
 #  print ("shifting down one level\n")
-  state.prep(continuation)
+#  state.prep(continuation)
+  [continuation] + state
 end
 
 def reify_continuation(state)
@@ -55,7 +59,7 @@ def shift_up(state)
     return state
   else
 #    print (" one level\n")
-    return state.rest
+    return state[1..-1] # state.rest
   end
 end
 
@@ -66,8 +70,8 @@ def prompt_and_read(level)
     print "> "
     parsed = $parser.parse($reader.read)
     raise $parser.failure_reason if parsed.nil?
-
-    code = parsed[0]
+    next if parsed.empty?
+    code = parsed.first
   end
   code.up
 end
@@ -81,30 +85,31 @@ def prompt_and_reply(result, level)
 end
 
 KERNEL_UTILITY_PARTS = [
-  [:"1ST", :SIMPLE, [:VEC], "(nth 1 vec)"],
+  [:"1ST", :SIMPLE, Rail.new(:VEC), "(nth 1 vec)"],
   
-  [:"2ND", :SIMPLE, [:VEC], "(nth 2 vec)"],
+  [:"2ND", :SIMPLE, Rail.new(:VEC), "(nth 2 vec)"],
   
-  [:"ATOM", :SIMPLE, [:EXP], "(= (type exp) 'atom)"],
+  [:"ATOM", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'atom)"],
   
-  [:"DE-REFLECT", :SIMPLE, [:CLOSURE], "
-    (ccons 'simple (environment closure) (pattern closure) (body closure))
+  [:"DE-REFLECT", :SIMPLE, Rail.new(:CLOSURE), "
+    (ccons 'simple (environment-designator closure) (pattern closure) (body closure))
   "],
   
-  [:"EMPTY", :SIMPLE, [:VEC], "(= 0 (length vec))"],
+#  [:"EMPTY", :SIMPLE, Rail.new(:VEC), "(= 0 (length vec))"], # primitive now
   
-  [:"MEMBER", :SIMPLE, [:ELEMENT, :VECTOR], "
+  [:"MEMBER", :SIMPLE, Rail.new(:ELEMENT, :VECTOR), "
     (cond [(empty vector) $F]
           [(= element (1st vector)) $T]
           [$T (member element (rest vector))])
   "],
   
-  [:"NORMAL", :SIMPLE, [:EXP], "
+  [:"NORMAL", :SIMPLE, Rail.new(:EXP), "
     ((lambda simple [t]
       (cond
         [(= t 'numeral) $T]
         [(= t 'boolean) $T]
         [(= t 'handle) $T]
+        [(= t 'string) $T]
         [(= t 'atom) $F]
         [(= t 'rail) (normal-rail exp)]
         [(= t 'closure) $T]
@@ -113,24 +118,24 @@ KERNEL_UTILITY_PARTS = [
      (type exp))
   "],
 
-  [:"NORMAL-RAIL", :SIMPLE, [:RAIL], "
+  [:"NORMAL-RAIL", :SIMPLE, Rail.new(:RAIL), "
     (cond
       [(empty rail) $T]
       [(normal (1st rail)) (normal-rail (rest rail))]
       [$T $F])  
   "],
 
-  [:"PAIR", :SIMPLE, [:EXP], "(= (type exp) 'pair)"],
+  [:"PAIR", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'pair)"],
 
-  [:"PRIMITIVE", :SIMPLE, [:CLOSURE], "(member closure primitive-closures)"],
+  [:"PRIMITIVE", :SIMPLE, Rail.new(:CLOSURE), "(member closure primitive-closures)"],
 
-  [:"PROMPT&READ", :SIMPLE, [:LEVEL], "
+  [:"PROMPT&READ", :SIMPLE, Rail.new(:LEVEL), "
     (block
       (print ↑level)
       (read '>))
   "],
   
-  [:"PROMPT&REPLY", :SIMPLE, [:"RESULT!", :LEVEL], "
+  [:"PROMPT&REPLY", :SIMPLE, Rail.new(:"RESULT!", :LEVEL), "
     (block
   	  (print ↑level)
       (print '=)
@@ -138,17 +143,17 @@ KERNEL_UTILITY_PARTS = [
       (terpri))  
   "],
 
-  [:"RAIL", :SIMPLE, [:EXP], "(= (type exp) 'rail)"],
+  [:"RAIL", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'rail)"],
 
-  [:"REFLECTIVE", :SIMPLE, [:CLOSURE], "(= (procedure-type closure) 'reflect)"],
+  [:"REFLECTIVE", :SIMPLE, Rail.new(:CLOSURE), "(= (procedure-type closure) 'reflect)"],
 
-  [:"REST", :SIMPLE, [:VEC], "(tail 1 vec)"],
+  [:"REST", :SIMPLE, Rail.new(:VEC), "(tail 1 vec)"],
 
-  [:"UNIT", :SIMPLE, [:VEC], "(= 1 (length vec))"],
+  [:"UNIT", :SIMPLE, Rail.new(:VEC), "(= 1 (length vec))"],
 
-  [:"SIMPLE", :SIMPLE, [:"DEF-ENV", :PATTERN, :BODY], "↓(ccons 'simple def-env pattern body)"],
+  [:"SIMPLE", :SIMPLE, Rail.new(:"DEF-ENV", :PATTERN, :BODY), "↓(ccons 'simple def-env pattern body)"],
 
-  [:"REFLECT", :SIMPLE, [:"DEF-ENV", :PATTERN, :BODY], "↓(ccons 'reflect def-env pattern body)"]
+  [:"REFLECT", :SIMPLE, Rail.new(:"DEF-ENV", :PATTERN, :BODY), "↓(ccons 'reflect def-env pattern body)"]
 
 # new simple version being explored    
 #  [:"SIMPLE", :SIMPLE, [:"DEF-ENV", :PATTERN, :BODY], "(ccons 'simple def-env pattern body)"],
@@ -156,7 +161,7 @@ KERNEL_UTILITY_PARTS = [
 ]
 
 KERNEL_UTILITY_PARTS.each {|e|
-  $global_env.bind_one(e[0].up, Closure.new(e[1].up, $global_env, Rail.new(e[2]).up, $parser.parse(e[3]).first.up).up)
+  $global_env.bind_one(e[0].up, Closure.new(e[1], $global_env, e[2], $parser.parse(e[3]).first).up)
 }
 
 
@@ -174,34 +179,30 @@ KERNEL_UTILITY_PARTS.each {|e|
 #  $global_env.bind_one(e[0].up, Closure.new(e[1].up, $global_env, Rail.new(e[2]).up, $parser.parse(e[3]).first.up).up)
 #}
 
-
-QUOTE_REFLECT = :REFLECT.up
-QUOTE_SIMPLE = :SIMPLE.up
-  
 RPP_PROC_PARTS = 
 {
   :"&&READ-NORMALISE-PRINT" => [
-    QUOTE_SIMPLE, Rail.new([:LEVEL, :ENV]).up,
+    :SIMPLE, Rail.new(:LEVEL, :ENV),
     $parser.parse("
       '(normalise (prompt&read level) env
          (lambda simple [result]                   ; REPLY continuation
            (block (prompt&reply result level)
              (read-normalise-print level env))))
-    ").first
+    ").first.down
   ],
 
   :"&&NORMALISE" => [
-    QUOTE_SIMPLE, Rail.new([:EXP, :ENV, :CONT]).up,
+    :SIMPLE, Rail.new(:EXP, :ENV, :CONT),
     $parser.parse("
       '(cond [(normal exp) (cont exp)]
              [(atom exp) (cont (binding exp env))]
              [(rail exp) (normalise-rail exp env cont)]
              [(pair exp) (reduce (car exp) (cdr exp) env cont)])
-    ").first
+    ").first.down
   ],
 
   :"&&REDUCE" => [
-    QUOTE_SIMPLE, Rail.new([:PROC, :ARGS, :ENV, :CONT]).up,
+    :SIMPLE, Rail.new(:PROC, :ARGS, :ENV, :CONT),
     $parser.parse("
       '(normalise proc env
          (lambda simple [proc!]                    ; PROC continuation
@@ -214,11 +215,11 @@ RPP_PROC_PARTS =
                                 (normalise (body proc!)
                                            (bind (pattern proc!) args! (environment proc!))
                                            cont)))))))
-    ").first
+    ").first.down
   ],
 
   :"&&NORMALISE-RAIL" => [
-    QUOTE_SIMPLE, Rail.new([:RAIL, :ENV, :CONT]).up,
+    :SIMPLE, Rail.new(:RAIL, :ENV, :CONT),
     $parser.parse("
       '(if (empty rail)
            (cont (rcons))
@@ -227,7 +228,7 @@ RPP_PROC_PARTS =
                         (normalise-rail (rest rail) env
                                         (lambda simple [rest!]         ; REST continuation
                                           (cont (prep first! rest!)))))))
-    ").first
+    ").first.down
   ],
 
 # implementation paper version
@@ -249,34 +250,34 @@ RPP_PROC_PARTS =
 
 # manual version
   :"&&LAMBDA" => [
-    QUOTE_REFLECT, Rail.new([Rail.new([:KIND, :PATTERN, :BODY]), :ENV, :CONT]).up,
+    :REFLECT, Rail.new(Rail.new(:KIND, :PATTERN, :BODY), :ENV, :CONT),
     $parser.parse("
-      '(reduce kind ↑[env pattern body] env cont)
-    ").first
+      '(reduce kind ↑[↑env pattern body] env cont)
+    ").first.down
   ],
 
   :"&&IF" => [
-    QUOTE_REFLECT, Rail.new([Rail.new([:PREMISE, :C1, :C2]), :ENV, :CONT]).up,
+    :REFLECT, Rail.new(Rail.new(:PREMISE, :C1, :C2), :ENV, :CONT),
     $parser.parse("
       '(normalise premise env
                   (lambda simple [premise!]
                     (normalise (ef ↓premise! c1 c2) env cont)))
-    ").first
+    ").first.down
   ],
 
   :"&&BLOCK" => [
-    QUOTE_REFLECT, Rail.new([:CLAUSES, :ENV, :CONT]).up,
+    :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
     $parser.parse("
       '(if (unit clauses)
            (normalise (1st clauses) env cont)
 		       (normalise (1st clauses) env
-					   (lambda simple []
+					   (lambda simple arg
 					     (normalise (pcons 'block (rest clauses)) env cont))))
-    ").first
+    ").first.down
   ],
 
   :"&&COND" => [
-    QUOTE_REFLECT, Rail.new([:CLAUSES, :ENV, :CONT]).up,
+    :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
     $parser.parse("
       '(if (empty clauses)
            (cont 'error)
@@ -285,7 +286,7 @@ RPP_PROC_PARTS =
                         (if ↓1st-condition! 
                             (normalise (2nd (1st clauses)) env cont)
                             (normalise (pcons 'cond (rest clauses)) env cont)))))
-    ").first
+    ").first.down
   ]
 }
   
@@ -317,17 +318,17 @@ $global_env.bind_one(:"GLOBAL".up, $global_env.up)
 RPP_CONT_PARTS =
 {
   :"&&REPLY-CONTINUATION"=> [
-    Rail.new([:LEVEL, :ENV, :"READ-NORMALISE-PRINT"]).up, 
-    Rail.new([:"RESULT"]).up,
+    Rail.new(:LEVEL, :ENV, :"READ-NORMALISE-PRINT"), 
+    Rail.new(:"RESULT"),
     $parser.parse("
       '(block (prompt&reply result level)
          (read-normalise-print level env))
-    ").first
+    ").first.down
   ],
 
   :"&&PROC-CONTINUATION" => [
-    Rail.new([:PROC, :ARGS, :ENV, :CONT, :REDUCE]).up,
-    Rail.new([:"PROC!"]).up,
+    Rail.new(:PROC, :ARGS, :ENV, :CONT, :REDUCE),
+    Rail.new(:"PROC!"),
     $parser.parse("
       '(if (reflective proc!)
            (↓(de-reflect proc!) args env cont)
@@ -340,12 +341,12 @@ RPP_CONT_PARTS =
                                     args!
                                     (environment proc!))
                               cont)))))
-    ").first
+    ").first.down
   ],
     
   :"&&ARGS-CONTINUATION" => [
-    Rail.new([:"PROC!", :PROC, :ARGS, :ENV, :CONT, :REDUCE]).up,
-    Rail.new([:"ARGS!"]).up,
+    Rail.new(:"PROC!", :PROC, :ARGS, :ENV, :CONT, :REDUCE),
+    Rail.new(:"ARGS!"),
     $parser.parse("
       '(if (primitive proc!)  ; HUP new draft misses the quote
            (cont ↑(↓proc! . ↓args!))
@@ -354,96 +355,96 @@ RPP_CONT_PARTS =
                             args!
                             (environment proc!))
                       cont))        
-    ").first
+    ").first.down
   ],
     
   :"&&FIRST-CONTINUATION" => [
-    Rail.new([:RAIL, :ENV, :CONT, :"NORMALISE-RAIL"]).up,
-    Rail.new([:"FIRST!"]).up,
+    Rail.new(:RAIL, :ENV, :CONT, :"NORMALISE-RAIL"),
+    Rail.new(:"FIRST!"),
     $parser.parse("
       '(normalise-rail (rest rail) env
                        (lambda [rest!]
                          (cont (prep first! rest!))))
-   ").first
+   ").first.down
   ],
     
   :"&&REST-CONTINUATION" => [
-    Rail.new([:"FIRST!", :RAIL, :ENV, :CONT, :"NORMALISE-RAIL"]).up,
-    Rail.new([:"REST!"]).up,
+    Rail.new(:"FIRST!", :RAIL, :ENV, :CONT, :"NORMALISE-RAIL"),
+    Rail.new(:"REST!"),
     $parser.parse("
       '(cont (prep first! rest!))
-    ").first
+    ").first.down
   ],
     
   :"&&IF-CONTINUATION" => [
-    Rail.new([:PREMISE, :C1, :C2, :ENV, :CONT, :IF]).up,
-    Rail.new([:"PREMISE!"]).up,
+    Rail.new(:PREMISE, :C1, :C2, :ENV, :CONT, :IF),
+    Rail.new(:"PREMISE!"),
     $parser.parse("
       '(normalise (ef ↓premise! c1 c2) env cont)      
-    ").first
+    ").first.down
   ],
     
   :"&&BLOCK-CONTINUATION" => [
-    Rail.new([:CLAUSES, :ENV, :CONT, :BLOCK]).up,
-    :"\?".up, # no arguments
+    Rail.new(:CLAUSES, :ENV, :CONT, :BLOCK),
+    :"\?", # no arguments
     $parser.parse("
       '(normalise (pcons 'block (rest clauses)) env cont)
-    ").first
+    ").first.down
   ],
     
   :"&&COND-CONTINUATION" => [
-    Rail.new([:CLAUSES, :ENV, :CONT, :COND]).up,
-    Rail.new([:"1st-condition!"]).up,
+    Rail.new(:CLAUSES, :ENV, :CONT, :COND),
+    Rail.new(:"1st-condition!"),
     $parser.parse("
       '(if ↓1st-condition!
            (normalise (2nd (1st clauses)) env cont)
            (normalise (pcons 'cond (rest clauses)) env cont)) 
-    ").first
+    ").first.down
   ]
 }
 
 def make_rpp_continuation(cont_name, args)
   parts = RPP_CONT_PARTS[cont_name]
-  Closure.new(QUOTE_SIMPLE, $global_env.bind_pattern(parts[0], args), parts[1], parts[2])
+  Closure.new(:SIMPLE, $global_env.bind_pattern(parts[0].up, args.up), parts[1], parts[2])
 end  
   
 def make_reply_continuation(level, env)
-  local_args = Rail.new([level, env, RPP_READ_NORMALISE_PRINT_CLOSURE]).up
+  local_args = Rail.new(level, env, RPP_READ_NORMALISE_PRINT_CLOSURE)
   make_rpp_continuation(:"&&REPLY-CONTINUATION", local_args)
 end
   
 def make_proc_continuation(proc, args, env, cont)
-  local_args = Rail.new([proc, args, env, cont, RPP_REDUCE_CLOSURE]).up
+  local_args = Rail.new(proc, args, env, cont, RPP_REDUCE_CLOSURE)
   make_rpp_continuation(:"&&PROC-CONTINUATION", local_args)
 end
 
 def make_args_continuation(proc_bang, proc, args, env, cont)
-  local_args = Rail.new([proc_bang, proc, args, env, cont, RPP_REDUCE_CLOSURE]).up
+  local_args = Rail.new(proc_bang, proc, args, env, cont, RPP_REDUCE_CLOSURE)
   make_rpp_continuation(:"&&ARGS-CONTINUATION", local_args)
 end
   
 def make_first_continuation(rail, env, cont)
-  local_args = Rail.new([rail, env, cont, RPP_NORMALISE_RAIL_CLOSURE]).up
+  local_args = Rail.new(rail, env, cont, RPP_NORMALISE_RAIL_CLOSURE)
   make_rpp_continuation(:"&&FIRST-CONTINUATION", local_args)
 end
   
 def make_rest_continuation(first_bang, rail, env, cont)
-  local_args = Rail.new([first_bang, rail, env, cont, RPP_NORMALISE_RAIL_CLOSURE]).up
+  local_args = Rail.new(first_bang, rail, env, cont, RPP_NORMALISE_RAIL_CLOSURE)
   make_rpp_continuation(:"&&REST-CONTINUATION", local_args)
 end
   
 def make_if_continuation(premise, c1, c2, env, cont)
-  local_args = Rail.new([premise, c1, c2, env, cont, RPP_IF_CLOSURE]).up
+  local_args = Rail.new(premise, c1, c2, env, cont, RPP_IF_CLOSURE)
   make_rpp_continuation(:"&&IF-CONTINUATION", local_args)
 end
   
 def make_block_continuation(clauses, env, cont)
-  local_args = Rail.new([clauses, env, cont, RPP_BLOCK_CLOSURE]).up
+  local_args = Rail.new(clauses, env, cont, RPP_BLOCK_CLOSURE)
   make_rpp_continuation(:"&&BLOCK-CONTINUATION", local_args)
 end
   
 def make_cond_continuation(clauses, env, cont)
-  local_args = Rail.new([clauses, env, cont, RPP_COND_CLOSURE]).up
+  local_args = Rail.new(clauses, env, cont, RPP_COND_CLOSURE)
   make_rpp_continuation(:"&&COND-CONTINUATION", local_args)
 end
 
@@ -501,7 +502,7 @@ end
   
 def plausible_continuation_designator(c_bang)
   return c_bang.closure_d? && !c_bang.down.reflective? && 
-         (c_bang.down.pattern.atom_d? || (c_bang.down.pattern.rail_d? && c_bang.down.pattern.length == 1)) 
+         (c_bang.down.pattern.atom? || (c_bang.down.pattern.rail? && c_bang.down.pattern.length == 1)) 
 end
 
 def threeLisp
@@ -510,9 +511,11 @@ def threeLisp
   level = 0                 # rather than 1 as in Implementation paper
   env = $global_env
   cont = nil
-  initial_defs = $parser.parse(IO.read("init.3lisp"))
+  initial_defs = $parser.parse(IO.read("init-manual.3lisp"))
+ 
   library_just_loaded = false
-# initial_defs.each{|e| p e}
+
+#  initial_defs.each{|e| p e}
   $stdout = File.open("/dev/null", "w")
   
 begin	
@@ -531,7 +534,7 @@ begin
 
     when :"&&READ-NORMALISE-PRINT"		# state level env
       if initial_defs.length > 0
-        ipp_args = [initial_defs.slice!(0).up]
+        ipp_args = [initial_defs.pop.up]
         library_just_loaded = true if initial_defs.length == 0
       else
         if library_just_loaded
@@ -558,7 +561,7 @@ begin
       exp = ipp_args[0]
       if exp.normal? then ipp_args = [cont, exp]; ipp_proc = :"&&CALL"
       elsif exp.atom_d? then ipp_args = [cont, env.binding(exp)]; ipp_proc = :"&&CALL"
-      elsif exp.rail_d? then ipp_proc = :"&&NORMALISE-RAIL"
+      elsif exp.rail_d? then ipp_proc = :"&&NORMALISE-RAIL";
       elsif exp.pair_d? then ipp_args = [exp.car, exp.cdr]; ipp_proc = :"&&REDUCE"
       else raise_error(self, "don't know how to noramlise #{exp}")
       end
@@ -575,8 +578,10 @@ begin
       proc = ex(:PROC.up, f); args = ex(:ARGS.up, f)
       env = ex(:ENV.up, f)
       cont = ex(:CONT.up, f)
-
-      if proc_bang.down.reflective?
+      
+      if !proc_bang.closure_d?
+        raise_error(self, "function expected but was given #{proc_bang.down.to_s}!")
+      elsif proc_bang.down.reflective?
         ipp_args = [proc_bang.down.de_reflect, args, env, cont]
         ipp_proc = :"&&CALL"
       else
@@ -618,8 +623,8 @@ begin
 		    next
 		  end
 		   
-      ipp_args = [proc_bang.down.body]
-      env = proc_bang.down.environment.bind_pattern(proc_bang.down.pattern, args_bang)
+      ipp_args = [proc_bang.down.body.up]
+      env = proc_bang.down.environment.bind_pattern(proc_bang.down.pattern.up, args_bang)
       ipp_proc = :"&&NORMALISE"		
 
 
@@ -637,9 +642,10 @@ begin
     when :"&&FIRST-CONTINUATION"			# state first! rail env cont
       first_bang = ipp_args[0]
       f = ipp_args[1]
-      rail = ex(:"RAIL".up, f);
+      rail = ex(:RAIL.up, f);
       env = ex(:ENV.up, f)
       cont = ex(:CONT.up, f)
+
       cont = make_rest_continuation(first_bang, rail, env, cont)
       ipp_args = [rail.rest]
       ipp_proc = :"&&NORMALISE-RAIL"
@@ -663,7 +669,7 @@ begin
 #      ipp_proc = :"&&CALL"
 
 # Manual version
-      ipp_args = [kind, Rail.new([env, pattern, body]).up]
+      ipp_args = [kind, Rail.new(env.up, pattern, body).up]
       ipp_proc = :"&&REDUCE"
 
     when :"&&IF"							# state [premise c1 c2] env cont
@@ -680,6 +686,8 @@ begin
       c2 = ex(:C2.up, f)
       env = ex(:ENV.up, f)
       cont = ex(:CONT.up, f)
+      
+      raise_error(self, "IF expects a truth value but was give #{premise_bang.down}") if !premise_bang.down.boolean?
       ipp_args = [premise_bang.down ? c1 : c2]
       ipp_proc = :"&&NORMALISE"
 
@@ -726,6 +734,7 @@ begin
     when :"&&CALL"						# state f a
       f = ipp_args[0]
       a = ipp_args[1..-1]
+      
       ipp_proc = ppp_type(f)
       if ipp_proc != :"UNKNOWN"
         ipp_args = a
@@ -739,15 +748,15 @@ begin
       end
 		
       if primitive?(f)
-        ipp_args = [reify_continuation(state), primitive_lambda(f).call(a).up] 
+        ipp_args = [reify_continuation(state), primitive_lambda(f).call(Rail.new(*a)).up] 
         state = shift_up(state)
         ipp_proc = :"&&CALL"
         next
       end
         
-      ipp_args = [f.body]
+      ipp_args = [f.body.up]
       
-      env = f.environment.bind_pattern(f.pattern, Rail.new(a).up)
+      env = f.environment.bind_pattern(f.pattern.up, Rail.new(*a).up)
       cont = reify_continuation(state)
       state = shift_up(state)
 
@@ -757,9 +766,9 @@ begin
       raise_error(self, "Implementation error: control has left the IPP");
     end
   end
-rescue RuntimeError => detail
-  print "3-Lisp run-time error: " + detail.message + "\n" 
-  retry
+#rescue RuntimeError => detail
+#  print "3-Lisp run-time error: " + detail.message + "\n" 
+#  retry
 end
 end
 

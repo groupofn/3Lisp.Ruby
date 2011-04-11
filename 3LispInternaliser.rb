@@ -88,11 +88,11 @@ class ThreeLispInternaliser
     $source[start..$index-2]
   end
 
-  def internalise_pair
+  def internalise_pair(bqlevel)
     skip_separators
     raise("Line #{$line} Column #{$column}: expression expected") if $index == $source.length
  
-    car = internalise_exp
+    car = internalise_exp(bqlevel)
 #    print "car: "; p car
     skip_separators
     raise("Line #{$line} Column #{$column}: expression expected") if $index == $source.length
@@ -100,24 +100,24 @@ class ThreeLispInternaliser
     if $source[$index] == PAIR_BREAK
       $index += 1; $column += 1
       skip_separators
-      cdr = internalise_exp
+      cdr = internalise_exp(bqlevel)
       skip_separators
       if $index == $source.length || $source[$index] != PAIR_END
         raise("Line #{$line} Column #{$column}: " + PAIR_END + " expected.") 
       end
       $index += 1; $column += 1  # absorb PAIR_END
     elsif $source[$index] == PAIR_END
-      cdr = Rail.new([])
+      cdr = Rail.new
       $index += 1; $column += 1  # absorb PAIR_END
     else
-      cdr = internalise_rail(PAIR_END)
+      cdr = internalise_rail(bqlevel, PAIR_END)
       $index += 1; $column += 1  # absorb PAIR_END
     end
     Pair.new(car, cdr)
   end
 
-  def internalise_rail(ending="")
-    exps = Rail.new([])
+  def internalise_rail(bqlevel, ending="")
+    exps = Rail.new
     while $index < $source.length
       skip_separators
       if $index == $source.length
@@ -132,30 +132,30 @@ class ThreeLispInternaliser
         end
         break
       else
-        exps.push(internalise_exp)
+        exps.append!(internalise_exp(bqlevel))
       end
     end
     exps 
   end
   
-  def internalise_exp
+  def internalise_exp(bqlevel)
 #  print "$source[$index]: "; p $source[$index]
     case $source[$index]
     when PAIR_START
       $index += 1; $column += 1
-      result = internalise_pair
+      result = internalise_pair(bqlevel)
     when RAIL_START
       $index += 1; $column += 1
-      result = Rail.new(internalise_rail(RAIL_END))
+      result = internalise_rail(bqlevel, RAIL_END)
     when QUOTE
       $index += 1; $column += 1 
-      result = Handle.new(internalise_exp)
+      result = Handle.new(internalise_exp(bqlevel))
     when UP
       $index += 1; $column += 1 
-      result = Pair.new(:UP, Rail.new([internalise_exp]))
+      result = Pair.new(:UP, Rail.new(internalise_exp(bqlevel)))
     when DOWN
       $index += 1; $column += 1 
-      result = Pair.new(:DOWN, Rail.new([internalise_exp]))    
+      result = Pair.new(:DOWN, Rail.new(internalise_exp(bqlevel)))    
     when NAME_START
       $index += 1; $column += 1 
       start = $index - 1
@@ -175,11 +175,12 @@ class ThreeLispInternaliser
       $index += 1; $column += 1 
       result = internalise_string
     when COMMA
-      $index += 1; $column += 1 
-      result = CommaExpression.new(internalise_exp) # no space between comma and what's comma-ed
+      $index += 1; $column += 1
+      raise("Line #{$line} Column #{$column}: ',' has no matching '`'.") if bqlevel < 1
+      result = CommaExpression.new(internalise_exp(bqlevel-1)) # no space between comma and what's comma-ed
     when BACKQUOTE
       $index += 1; $column += 1   # no space between backquote and what's quoted
-      exp = internalise_exp
+      exp = internalise_exp(bqlevel+1)
       result = process_bq(exp)
     else # atom or numeral 
       start = $index
@@ -214,14 +215,14 @@ class ThreeLispInternaliser
     $column = 1
     $source = source
     
-    internalise_rail
+    internalise_rail(0)
   end
 
   def process_bq(exp)
     if exp.class == CommaExpression
       exp.exp
     elsif exp.class == Pair
-      Pair.new(:PCONS, Rail.new([process_bq(exp.car), process_bq(exp.cdr)]))
+      Pair.new(:PCONS, Rail.new(process_bq(exp.car), process_bq(exp.cdr)))
     elsif exp.class == Rail
       Pair.new(:RCONS, exp.map{|e| process_bq(e)})
     else
