@@ -151,6 +151,8 @@ KERNEL_UTILITY_PARTS = [
 
   [:"UNIT", :SIMPLE, Rail.new(:VEC), "(= 1 (length vec))"],
 
+  [:"ENVIRONMENT-OF", :SIMPLE, Rail.new(:CLOSURE), "↓(environment-designator closure)"],
+
   [:"SIMPLE", :SIMPLE, Rail.new(:"DEF-ENV", :PATTERN, :BODY), "↓(ccons 'simple def-env pattern body)"],
 
   [:"REFLECT", :SIMPLE, Rail.new(:"DEF-ENV", :PATTERN, :BODY), "↓(ccons 'reflect def-env pattern body)"]
@@ -213,7 +215,7 @@ RPP_PROC_PARTS =
                             (if (primitive proc!)
                                 (cont ↑(↓proc! . ↓args!))
                                 (normalise (body proc!)
-                                           (bind (pattern proc!) args! (environment proc!))
+                                           (bind (pattern proc!) args! (environment-of proc!))
                                            cont)))))))
     ").first.down
   ],
@@ -265,6 +267,7 @@ RPP_PROC_PARTS =
     ").first.down
   ],
 
+=begin
   :"&&BLOCK" => [
     :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
     $parser.parse("
@@ -275,6 +278,19 @@ RPP_PROC_PARTS =
 					     (normalise (pcons 'block (rest clauses)) env cont))))
     ").first.down
   ],
+=end
+  :"&&BLOCK" => [
+    :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
+    $parser.parse("
+      '(if (unit clauses)
+           (normalise (1st clauses) env cont)
+		       (normalise (1st clauses) env
+					   (lambda simple arg
+					     (normalise (pcons 'block (rest clauses)) env cont))))
+    ").first.down
+  ],
+
+
 
   :"&&COND" => [
     :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
@@ -339,7 +355,7 @@ RPP_CONT_PARTS =
                    (normalise (body proc!)
                               (bind (pattern proc!)
                                     args!
-                                    (environment proc!))
+                                    (environment-of proc!))
                               cont)))))
     ").first.down
   ],
@@ -353,7 +369,7 @@ RPP_CONT_PARTS =
            (normalise (body proc!)
                       (bind (pattern proc!)
                             args!
-                            (environment proc!))
+                            (environment-of proc!))
                       cont))        
     ").first.down
   ],
@@ -509,8 +525,6 @@ def threeLisp
   # global to threeLisp: state, level, env, cont
   state = initial_tower(1)  # rather than initial_tower(2) as in Implementation paper
   level = 0                 # rather than 1 as in Implementation paper
-  env = $global_env
-  cont = nil
   initial_defs = $parser.parse(IO.read("init-manual.3lisp"))
  
   library_just_loaded = false
@@ -518,9 +532,13 @@ def threeLisp
 #  initial_defs.each{|e| p e}
   $stdout = File.open("/dev/null", "w")
   
+oldtime = Time.now
+
 begin	
 	ipp_proc = :"&&READ-NORMALISE-PRINT"
 	ipp_args = [] 	  # "arguments" passed among the && procs as an array; none to READ-NORMALISE-PRINT  	  	  
+  env = $global_env 
+  cont = nil
 	
 	until false do
 
@@ -543,10 +561,15 @@ begin
           library_just_loaded = false
         end
 
+        elapsed = Time.now - oldtime
+# uncomment the following line to get time for each interaction
+#        p elapsed
+                
   	    ipp_args = [prompt_and_read(level)] # initialize here!
       end
       cont = make_reply_continuation(level, env)
       ipp_proc = :"&&NORMALISE"
+      oldtime = Time.now
 		
 	  when :"&&REPLY-CONTINUATION"			# state result level env
       result = ipp_args[0]
@@ -766,9 +789,9 @@ begin
       raise_error(self, "Implementation error: control has left the IPP");
     end
   end
-#rescue RuntimeError => detail
-#  print "3-Lisp run-time error: " + detail.message + "\n" 
-#  retry
+rescue RuntimeError, ZeroDivisionError => detail
+  print "3-Lisp run-time error: " + detail.message + "\n" 
+  retry
 end
 end
 

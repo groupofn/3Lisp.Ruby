@@ -247,6 +247,9 @@ class ExpReader
           else
             print "\a"
           end
+        when "\003" # CTRL+c
+          print "\r\n"
+          Process.exit
         when /^.$/ # "SINGLE CHAR"
           # if paren, then check ... 
           char = @indent_unit if char == "\t"

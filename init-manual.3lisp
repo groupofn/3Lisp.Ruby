@@ -62,6 +62,7 @@
   (lambda simple [] "3Lisp version R00, April 15, 2011"))
 
 (define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
+;(define DOUBLE (lambda simple [vec] (and (not (empty vec)) (unit (rest vec))))) ; Manual version: slow on short vectors
 
 (define EXTERNAL    (lambda simple [x]
                       (member (type x) 
@@ -71,6 +72,16 @@
 (define VECTOR-CONSTRUCTOR
   (lambda simple [template]
     (if (external template) scons rcons)))
+
+;(define MAP
+;  (lambda simple args
+;    (if (empty (2nd args)) 
+;        ((vector-constructor (2nd args)))
+;        (if (double args)
+;            (prep ((1st args) (1st (2nd args)))
+;                  (map (1st args) (rest (2nd args))))
+;            (prep ((1st args) . (map 1st (rest args)))
+;                  (map . (prep (1st args) (map rest (rest args)))))))))
 
 (define MAP
   (lambda simple args
@@ -99,6 +110,28 @@
 (define LET
   (lambda macro [list body]
     `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
+
+(define 1sts
+  (lambda simple [list]
+    (cond
+      [(empty list) ((vector-constructor list))]
+      [$T (prep (1st (1st list)) (1sts (rest list)))])))
+
+(define 2nds
+  (lambda simple [list]
+    (cond
+      [(empty list) ((vector-constructor list))]
+      [$T (prep (2nd (1st list)) (2nds (rest list)))])))
+
+(define LET                                                       ; performance of this version is 20% better than using MAP
+  (lambda macro [list body]
+    `((lambda simple ,(1sts list) ,body) . ,(2nds list))))
+
+;(define LET                                                      ; performance of this version is only slightly better.
+;  (lambda reflect [[list body] env cont]
+;    (normalise (2nds list) env 
+;      (lambda simple [args!]
+;        (normalise body (bind (1sts list) args! env) cont)))))
 
 (define LETSEQ
   (lambda macro [list body]
@@ -296,14 +329,14 @@
   (lambda simple args
     (pcons (1st args) (rcons . (rest args)))))
 
-(define MAP
-  (lambda simple args
-    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
-          [(double args)
-           (prep ((1st args) (1st (2nd args)))
-                 (map (1st args) (rest (2nd args))))]
-          [$T (prep ((1st args) . (map 1st (rest args)))
-                    (map . (prep (1st args) (map rest (rest args)))))])))
+;(define MAP
+;  (lambda simple args
+;    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+;          [(double args)
+;           (prep ((1st args) (1st (2nd args)))
+;                 (map (1st args) (rest (2nd args))))]
+;          [$T (prep ((1st args) . (map 1st (rest args)))
+;                    (map . (prep (1st args) (map rest (rest args)))))])))
 
 (define COPY-VECTOR
   (lambda simple [vector]

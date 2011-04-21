@@ -342,39 +342,32 @@ class Handle
   end
 
   def car
-    raise_error(self, "#{self} must refer to a pair") if !@quoted.pair?
     @quoted.car.up
   end
   
   def cdr
-    raise_error(self, "#{self} must refer to a pair") if !@quoted.pair?
     @quoted.cdr.up
   end
 
   def rplaca(new_car)
-    raise_error(self, "#{self} must refer to a pair") if !@quoted.pair?
     @quoted.car = new_car.down
     @quoted.car.up
   end
 
   def rplacd(new_cdr)
-    raise_error(self, "#{self} must refer to a pair") if !@quoted.pair?
     @quoted.cdr = new_cdr.down
     @quoted.cdr.up
   end
   
   def length
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
     quoted.length
   end
   
   def empty?
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
     quoted.empty?
   end
 
   def nth(n)
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
     quoted.nth(n).up
   end
 
@@ -395,7 +388,6 @@ class Handle
   end
   
   def tail(n)
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
     quoted.tail(n).up
   end
 
@@ -404,22 +396,16 @@ class Handle
   end
 
   def prep(e)
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail? 
-    raise_error(self, "#{e} must be a handle") if !e.handle?
     quoted.prep(e.down).up
   end  
  
   # side effect: should alter self instead of returning new struct
   def rplacn(n, e)
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
-    raise_error(self, "#{e} must be a handle") if !e.handle?
     quoted.rplacn(n, e.down).up
   end
 
   # side effect: should alter self instead of returning new struct
   def rplact(n, t)
-    raise_error(self, "#{self} must refer to a rail") if !@quoted.rail?
-    raise_error(self, "#{t} must be a handle") if !t.handle?
     quoted.rplact(n, t.down).up
   end
   
@@ -474,7 +460,8 @@ class Rail
   end
 
   def prep(e)
-    r = Rail.new(e)
+    r = Rail.new
+    r.element = e
     r.remaining = self
     return r
   end
@@ -694,7 +681,7 @@ class Environment
       newbindings[pattern] = args
     else
       pattern = pattern.down.map{|element| element.up} if pattern.rail_d?
-      if args.handle?
+      if args.handle? # didn't quite understand this part ...
         if args.rail_d?
           args = args.down.map{|element| element.up} if args.rail_d?
         elsif args.down.rail_d?

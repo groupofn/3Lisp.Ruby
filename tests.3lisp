@@ -121,16 +121,16 @@
 (member 1 2)                ; Error
 (member * [+ - * /])        ; Error
 
-(vector-constructor '[])    ; => {Closure: 'SIMPLE  'args 'RCONS}
+(vector-constructor '[])    ; => {Closure: SIMPLE  args RCONS}
 ((vector-constructor '[]))  ; => '[]
-(vector-constructor 10)     ; => {Closure: 'SIMPLE  'args 'SCONS}
+(vector-constructor 10)     ; => {Closure: SIMPLE  args SCONS}
 ((vector-constructor 100))  ; => []
 ((vector-constructor ↑↑1))  ; => '[]
 
 (map 1+ [2 3 4])            ; => [3 4 5]
 (map * [1 2 3] [1 2 3])     ; => [1 4 9]
 (map EF [$T $F] [1 2] [3 4]); => [1 4]
-(map car [])                ; => [
+(map car [])                ; => []
 (map up '[1 A $T])          ; => '['1 'A '$T]
 (map 1+ [1 2 3] [4 5 6])    ; Error
 (map 1 [1 2 3])             ; Error
@@ -150,8 +150,7 @@
 (LET [[X '[1 2 3]] [Y '[4 5]]]
   (BLOCK 
     (CONCATENATE X Y) 
-    [X Y]))                   ; => ['[1 2 3 4 5]
-                              ;     '[4 5]]
+    [X Y]))                   ; => ['[1 2 3 4 5] '[4 5]]
 
 (APPEND [1 2 3] [4 5 6])      ; => [1 2 3 4 5 6]
 (APPEND '[] '[A B C])         ; => '[A B C]
@@ -208,12 +207,12 @@ s                             ; => [1]
 (procedure-type ↑if)                    ; => 'REFLECT
 (procedure-type IF)                     ; Error
 
-(environment-designator (ccons 'x ↑(econs) 'y 'z))  ; => #<Environment:#####>
+(environment-designator (ccons 'x ↑(econs) 'y 'z))  ; => '#<Environment:#####>
 (environment-designator +)              ; Error
 
 ; ENVIRONMENT is the charactersitic function of the type Environment
-; (environment (ccons 'x ↑(econs) 'y 'z))  ; => #<Environment:#####>
-; (environment +)              ; Error
+; (environment-of (ccons 'x ↑(econs) 'y 'z))  ; => #<Environment:#####>
+; (environment-of +)              ; Error
 
 (pattern (ccons 'x ↑(econs) 'y 'z))           ; => 'Y
 (pattern ↑(lambda simple [a b] (pcons b a)))  ; => '[A B]
@@ -396,7 +395,7 @@ s                             ; => [1]
 (simple ↑(bind 'x '1 (econs)) '[] 'x)         ; => {Closure: SIMPLE #<Environment:#######> [] X}
 ((simple ↑(bind 'x '1 (econs)) '[] 'x))       ; => 1
 ((simple ↑global '[x] '(+ x 2)) 99)           ; => 101
-((simple ↑(econs) '[x] '(acons)) 99)          ; Error
+((simple ↑(econs) '[x] '(acons)) 99)          ; Error   ; Something weird happens here!!!
 
 (set reflect-test
   (lambda reflect [args env cont]
@@ -613,7 +612,7 @@ y                   ; => 4
   (block (replace x '[new tail])
          x))                        ; => '[NEW TAIL]
 
-; test case for closure
+; test case for replacing closure
 (define add
   (lambda simple [x y]
     (+ x y)))
@@ -626,7 +625,7 @@ y                   ; => 4
             (block 
               (print "adding up ") 
               (print ↑x) 
-              (print " and ") 
+              (print "and ") 
               (print ↑y) 
               (terpri) 
               (+ x y))))
@@ -771,12 +770,8 @@ z                                   ; => '[THREE]
   (lambda macro [x] ↑x))                          ; => '(RCONS)
 
 
-(bind '[x] '[2] global)
-x ; => 2
-(bind '[x] ''[2] global)
-x ; => '[2]
-
-
+(binding 'x (bind '[x] '[2] global))              ; => '2
+(binding 'x (bind '[x] ''[2] global))             ; => '
 
 
 ;;; Booleans
@@ -898,6 +893,7 @@ x ; => '[2]
       1
       (* n (fact (1- n))))))
 
+(fact 10)
 
 ;;;;;;;;;;;;;
 ;;;
@@ -1188,7 +1184,7 @@ if
                     (cont ↑(↓proc! . ↓args!))
                     (normalise#
                        (body proc!)
-                       (bind (pattern proc!) args! (environment proc!))
+                       (bind (pattern proc!) args! (environment-of proc!))
                        cont)))))))))
 
 
