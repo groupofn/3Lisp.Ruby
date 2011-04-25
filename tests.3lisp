@@ -461,6 +461,8 @@ y                   ; => 4
 (bind '(a . b) '(1 . 2) (econs))          ; Error
 
 (let [[x 3] [y 4]] (+ x y))               ; => 7
+((lambda simple [x y] (+ x y)) 3 4)
+
 (let [[[a b] (rest [1 2 3])]] (+ a b))    ; => 5
 (let [[x 3]]
   (let [[x 4] [y x]] (+ x y)))            ; => 7
