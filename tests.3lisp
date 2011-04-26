@@ -376,6 +376,7 @@ s                             ; => [1]
       (lambda simple [n]
         (if (= n 0) 1 (* n (self (1- n))))))))
 (factorial 6)       ; => 720
+(factorial 100)
 
 (set even&odd
   (y*-operator
@@ -395,7 +396,7 @@ s                             ; => [1]
 (simple ↑(bind 'x '1 (econs)) '[] 'x)         ; => {Closure: SIMPLE #<Environment:#######> [] X}
 ((simple ↑(bind 'x '1 (econs)) '[] 'x))       ; => 1
 ((simple ↑global '[x] '(+ x 2)) 99)           ; => 101
-((simple ↑(econs) '[x] '(acons)) 99)          ; Error   ; Something weird happens here!!!
+((simple ↑(econs) '[x] '(acons)) 99)          ; Error   
 
 (set reflect-test
   (lambda reflect [args env cont]
@@ -443,7 +444,7 @@ x                 ; => 8
 y                   ; => 4
 
 
-(binding 'y (bind 'x 1 (bind 'y '2 (bind 'z '3 (econs)))))  ; => '2
+(binding 'y (bind 'x '1 (bind 'y '2 (bind 'z '3 (econs)))))  ; => '2
 (binding 'normalise global)                                 ; => {Closure: SIMPLE ...}
 (let [[x (+ 1 2)]]
   ((lambda reflect [args env cont]
@@ -773,7 +774,7 @@ z                                   ; => '[THREE]
 
 
 (binding 'x (bind '[x] '[2] global))              ; => '2
-(binding 'x (bind '[x] ''[2] global))             ; => '
+(binding 'x (bind '[x] ''[2] global))             ; => ''2 ; why?
 
 
 ;;; Booleans

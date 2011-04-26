@@ -1,13 +1,15 @@
 # encoding: UTF-8
 
+require './3LispError.rb'
+
 class Environment
   include ThreeLispError
   
   # @local is a hash; @tail is either an environment or an empty hash
-  attr_reader :local, :tail
+  attr_accessor :local, :tail
 
-  def initialize(tail)
-    @local, @tail = {}, tail
+  def initialize(local, tail)
+    self.local, self.tail = local, tail
   end
   
   def to_s
@@ -20,8 +22,8 @@ class Environment
 
   def bound_atoms
     return Rail.new if empty?
-    return Rail.array2rail(@local.keys) if tail.empty?
-    return Rail.array2rail(@local.keys).tail.bound_atoms)
+    return Rail.array2rail(local.keys) if tail.empty?
+    return Rail.array2rail(local.keys).join(tail.bound_atoms)
   end
   
   def var_is_bound?(var)
@@ -31,7 +33,7 @@ class Environment
   end
 
   def binding(var)
-    result = @local[var]
+    result = local[var]
 
     if !result.nil?
       result
@@ -43,18 +45,18 @@ class Environment
   end
   
   def rebind_one(var, arg)
-    @local[var] = arg if !rebind_one_helper(var, arg)
+    local[var] = arg if !rebind_one_helper(var, arg)
     arg
   end
 protected
   def rebind_one_helper(var, arg)
-    if @local.key?(var)
-  	  @local[var] = arg
+    if local.key?(var)
+  	  local[var] = arg
 	    return true
-	  elsif @tail.empty?
+	  elsif tail.empty?
 	    return false
 	  else
-	    @tail.rebind_one_helper(var, arg)
+	    tail.rebind_one_helper(var, arg)
 	  end
   end
 
@@ -96,6 +98,7 @@ public
   def pp(*args)
     if args.size == 0
       pp_helper(1, 0, true)
+      puts "~~ BOTTOM ~~\n\n"
     else
       pp_helper(1, args[0], false)
     end
@@ -110,18 +113,14 @@ protected
 
     if !tail.empty? && (all_levels || remaining > 0)
       tail.pp_helper(current + 1, remaining - 1, all_levels) 
-    end
-    
-    if all_levels
-      puts "~~ BOTTOM ~~\n\n"
-    else
+    elsif !all_levels
       puts "~~ Stopped at level #{current} ~~\n\n"
     end
   end
   
 public
   # see page 277 of Implementation paper
-  # this could be slow in comparison to a rail implementation
+  # this could be slower than a rail implementation
   def similar?(template)  
     return true if self.equal?(template)
     
@@ -130,16 +129,15 @@ public
 
     return false if self_keys.length != template_keys.length
     
-    # is sort here slow?
-    self_keys.sort.zip(template_keys.sort).each { |key_pair|
+    self_keys.zip(template_keys).each { |key_pair|
 	    return false if key_pair[0] != key_pair[1]
-     
-      if template.local[key_pair[1]].to_s != "''?" # try with a global variable of :"''?" to see whether it's faster
-        return false if local[key_pair[0]].eq?(template.local[key_pair[1]]) # should be eq?, rather than ==
+      
+      if template.local[key_pair[1]].down != $ppc_t_a # :"''?" # try with a global variable of :"''?" to see whether it's faster
+         return false if !(local[key_pair[0]].eq?(template.local[key_pair[1]])) # should be eq?, rather than ==
       end
     }
     
-	  return true if @tail.empty? && template.tail.empty?
-	  @tail.similar?(template.tail)
+	  return true if tail.empty? && template.tail.empty?
+	  tail.similar?(template.tail)
   end
 end

@@ -1,13 +1,7 @@
 # encoding: UTF-8
 
-require './3LispBasicRubyClassesExtension.rb'
-require './3LispClosure.rb'
-require './3LispEnvironment.rb'
-require './3LispHandle.rb'
-require './3LispPair.rb'
-require './3LispRail.rb'
+require './3LispClasses.rb'
 
-# singleton class?
 
 def ruby_lambda_for_primitive(closure)
   PRIMITIVES.assoc(closure.body)[3]
@@ -49,7 +43,7 @@ PRIMITIVES = [
   [:TYPE, :SIMPLE, Rail.new(:struc), lambda{|args| args.first.ref_type.up }],
   [:UP, :SIMPLE, Rail.new(:struc), lambda{|args| args.first.up }],
   [:DOWN, :SIMPLE, Rail.new(:struc), lambda{|args|
-    raise_error(self, "DOWN expects a structure but was given #{args.first.to_s}") if !args.first.handle?
+    raise_error(self, "DOWN expects a normal-form structure but was given #{args.first.to_s}") if !args.first.normal?
     result = args.first.down
     return result }],
   [:REPLACE, :SIMPLE, Rail.new(:struc1, :struc2), lambda{|args|
@@ -243,7 +237,7 @@ PRIMITIVES = [
     args.first.down.pattern.up  }],
   [:"PROCEDURE-TYPE", :SIMPLE, Rail.new(:closure), lambda{|args| 
     raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
-    args.first.down.type.up }],
+    args.first.down.kind.up }],
   
   [:ECONS, :SIMPLE, Rail.new(:env), lambda{|args| 
     return Environment.new({}, {}) if args.empty? 
@@ -263,7 +257,7 @@ PRIMITIVES = [
     raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
     raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
     raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
-    args.third.bind_one(args.first, args.second) }],
+    args.third.rebind_one(args.first, args.second) }],
   [:BOUND, :SIMPLE, Rail.new(:var, :env), lambda{|args|
     raise_error(self, "BOUND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
     raise_error(self, "BOUND expects an environment but was given #{args.second.to_s}") if !args.second.environment?
@@ -276,4 +270,6 @@ PRIMITIVES = [
 ]
 
 PRIMITIVE_PROC_NAMES = PRIMITIVES.map { |primitive| primitive[0].up }
+
+
 # END primitive procedures

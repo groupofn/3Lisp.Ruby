@@ -2,6 +2,9 @@
 
 require './3LispError.rb'
 
+### TO DO 
+# [ ] pretty print ... Does it belong here?
+
 # Basic extension
 class TrueClass
   def to_s
@@ -175,7 +178,7 @@ class Object
     when :HANDLE
       return self.down.isomorphic(other.down)
     when :CLOSURE
-      return self.type == other.type &&
+      return self.kind == other.kind &&
              self.pattern.isomorphic(other.pattern) &&
              self.body.isomorphic(other.body) &&
              self.environment.similar?(other.environment)

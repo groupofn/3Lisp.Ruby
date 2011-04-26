@@ -9,40 +9,40 @@ class Rail
 
   def initialize(*args)
     if args.size == 0 
-      @element = nil
-      @remaining = nil
+      self.element = nil
+      self.remaining = nil
     else
-      @element = args[0]
-      @remaining = Rail.new(*args[1..-1])
+      self.element = args[0]
+      self.remaining = Rail.new(*args[1..-1])
     end
   end
   
   def empty?
-    element == nil # && @rest == nil
+    element == nil
   end
 
   def to_s
-    "[" + empty? ? "" : element.to_s + remaining.r_to_s + "]"
+    "[" + (empty? ? "" : (element.to_s + remaining.r_to_s)) + "]"
   end
-private  
+protected  
   def r_to_s
-    empty? ? "" : " " + element.to_s + remaining.r_to_s
+    empty? ? "" : (" " + element.to_s + remaining.r_to_s)
   end
   
-  def scons(args)
+public
+  def self.scons(args)
     args.map{|element|       
       element
     }
   end
 
-  def rcons(args)
+  def self.rcons(args)
     args.map{|element| 
       raise "RCONS expects structure but was given #{element.to_s}" if !element.handle?     
       element.down
     }.up
   end
 
-public
   def self.array2rail(arr)
     r = Rail.new
     t = r
@@ -146,7 +146,7 @@ public
     raise_error(self, "RPLACN: index is out of bound") if empty?
 
     if n == 1
-      element = e
+      self.element = e
       return Handle.new(:OK)
     elsif n > 1
       remaining.rplacn(n-1, e)
@@ -159,8 +159,8 @@ public
     raise_error(self, "RPLACT: index is out of bound") if n < 0 || n > length
     
     if n == 0
-      element = t.element
-      remaining = t.remaining
+      self.element = t.element
+      self.remaining = t.remaining
       return self
     else
       tail(n-1).remaining = t # returned
@@ -179,25 +179,24 @@ public
     t.remaining = r
     self
   end
-end
 
-=begin
   def push(e)
     r = remaining
     old_top = element
-    element = e
-    remaining = Rail.new
-    remaining.element = old_top
-    remaining.remaining = r
+    self.element = e
+    self.remaining = Rail.new
+    self.remaining.element = old_top
+    self.remaining.remaining = r
     return self
   end
   
   def pop
     raise_error(self, "POP: attempt to pop from empty rail") if empty?
     old_top = element
-    element = remaining.element
-    remaining = remaining.remaining
+    self.element = remaining.element
+    self.remaining = remaining.remaining
     return old_top
   end
-=end
+end
+
 

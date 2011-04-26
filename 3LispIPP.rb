@@ -1,17 +1,18 @@
 # encoding: UTF-8
 
 require 'rubygems'
-#require 'polyglot'
-#require 'treetop'
-require './3LispInternaliser.rb'
-#require './3LispParser_node_modules.rb'
 require './3LispReader.rb'
 require './3LispClasses.rb'
+require './3LispInternaliser.rb'
+require './3LispPrimitives.rb'
 
 $STRINGS_used_by_ACONS = {}
 
 $parser = ThreeLispInternaliser.new
 $reader = ExpReader.new
+
+
+#####
 
 primitive_bindings = {}
 
@@ -22,16 +23,20 @@ PRIMITIVES.map { |primitive|
 }
 
 $global_env = Environment.new(primitive_bindings, {}) # tail env is empty!
+$ppc_t_a = Handle.new(:"\?")  # ppc template argument
+
 
 PRIMITIVE_CLOSURES = PRIMITIVE_PROC_NAMES.map {|var| $global_env.binding(var) }
 PRIMITIVE_PROCS = PRIMITIVE_CLOSURES.map {|c| c.down }
-
 
 def primitive?(closure)
   PRIMITIVE_PROCS.include?(closure)
 end  
 
-$global_env.bind_one(:"PRIMITIVE-CLOSURES".up, Rail.new(*PRIMITIVE_CLOSURES).up)
+$global_env.rebind_one(:"PRIMITIVE-CLOSURES".up, Rail.new(*PRIMITIVE_CLOSURES).up)
+
+
+#####
 
 def initial_tower(level)
   [level]
@@ -163,7 +168,7 @@ KERNEL_UTILITY_PARTS = [
 ]
 
 KERNEL_UTILITY_PARTS.each {|e|
-  $global_env.bind_one(e[0].up, Closure.new(e[1], $global_env, e[2], $parser.parse(e[3]).first).up)
+  $global_env.rebind_one(e[0].up, Closure.new(e[1], $global_env, e[2], $parser.parse(e[3]).first).up)
 }
 
 
@@ -178,7 +183,7 @@ KERNEL_UTILITY_PARTS.each {|e|
 #]
 
 #EXTENDED_UTILITY_PARTS.each {|e|
-#  $global_env.bind_one(e[0].up, Closure.new(e[1].up, $global_env, Rail.new(e[2]).up, $parser.parse(e[3]).first.up).up)
+#  $global_env.rebind_one(e[0].up, Closure.new(e[1].up, $global_env, Rail.new(e[2]).up, $parser.parse(e[3]).first.up).up)
 #}
 
 RPP_PROC_PARTS = 
@@ -320,16 +325,16 @@ RPP_IF_CLOSURE = make_rpp_proc(:"&&IF")
 RPP_BLOCK_CLOSURE = make_rpp_proc(:"&&BLOCK")
 RPP_COND_CLOSURE = make_rpp_proc(:"&&COND")
   
-$global_env.bind_one(:"READ-NORMALISE-PRINT".up, RPP_READ_NORMALISE_PRINT_CLOSURE.up)
-$global_env.bind_one(:"NORMALISE".up, RPP_NORMALISE_CLOSURE.up)
-$global_env.bind_one(:"REDUCE".up, RPP_REDUCE_CLOSURE.up)
-$global_env.bind_one(:"NORMALISE-RAIL".up, RPP_NORMALISE_RAIL_CLOSURE.up)
-$global_env.bind_one(:"LAMBDA".up, RPP_LAMBDA_CLOSURE.up)
-$global_env.bind_one(:"IF".up, RPP_IF_CLOSURE.up)
-$global_env.bind_one(:"BLOCK".up, RPP_BLOCK_CLOSURE.up)
-$global_env.bind_one(:"COND".up, RPP_COND_CLOSURE.up)
+$global_env.rebind_one(:"READ-NORMALISE-PRINT".up, RPP_READ_NORMALISE_PRINT_CLOSURE.up)
+$global_env.rebind_one(:"NORMALISE".up, RPP_NORMALISE_CLOSURE.up)
+$global_env.rebind_one(:"REDUCE".up, RPP_REDUCE_CLOSURE.up)
+$global_env.rebind_one(:"NORMALISE-RAIL".up, RPP_NORMALISE_RAIL_CLOSURE.up)
+$global_env.rebind_one(:"LAMBDA".up, RPP_LAMBDA_CLOSURE.up)
+$global_env.rebind_one(:"IF".up, RPP_IF_CLOSURE.up)
+$global_env.rebind_one(:"BLOCK".up, RPP_BLOCK_CLOSURE.up)
+$global_env.rebind_one(:"COND".up, RPP_COND_CLOSURE.up)
 
-$global_env.bind_one(:"GLOBAL".up, $global_env.up)
+$global_env.rebind_one(:"GLOBAL".up, $global_env.up)
 
 RPP_CONT_PARTS =
 {
@@ -490,14 +495,14 @@ def ppp_type(closure)
 end
   
 PPC_TABLE = [
-  [:"&&PROC-CONTINUATION", make_proc_continuation(:"\?".up, :"\?".up, :"\?".up, :"\?".up)],
-  [:"&&ARGS-CONTINUATION", make_args_continuation(:"\?".up, :"\?".up, :"\?".up, :"\?".up, :"\?".up)],
-  [:"&&FIRST-CONTINUATION", make_first_continuation(:"\?".up, :"\?".up, :"\?".up)],
-  [:"&&REST-CONTINUATION", make_rest_continuation(:"\?".up, :"\?".up, :"\?".up, :"\?".up)],
-  [:"&&REPLY-CONTINUATION", make_reply_continuation(:"\?".up, :"\?".up)],
-  [:"&&IF-CONTINUATION", make_if_continuation(:"\?".up, :"\?".up, :"\?".up, :"\?".up, :"\?".up)],
-  [:"&&BLOCK-CONTINUATION", make_block_continuation(:"\?".up, :"\?".up, :"\?".up)],
-  [:"&&COND-CONTINUATION", make_cond_continuation(:"\?".up, :"\?".up, :"\?".up)],
+  [:"&&PROC-CONTINUATION", make_proc_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&ARGS-CONTINUATION", make_args_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&FIRST-CONTINUATION", make_first_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&REST-CONTINUATION", make_rest_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&REPLY-CONTINUATION", make_reply_continuation($ppc_t_a, $ppc_t_a)],
+  [:"&&IF-CONTINUATION", make_if_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&BLOCK-CONTINUATION", make_block_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
+  [:"&&COND-CONTINUATION", make_cond_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
 ]
     
 def ppc_type(closure)
@@ -563,7 +568,7 @@ begin
 
         elapsed = Time.now - oldtime
 # uncomment the following line to get time for each interaction
-#        p elapsed
+        p elapsed
                 
   	    ipp_args = [prompt_and_read(level)] # initialize here!
       end
@@ -620,6 +625,7 @@ begin
       env = ex(:ENV.up, f)
       cont = ex(:CONT.up, f)
       if primitive?(proc_bang.down)
+#      puts "in args-continuation !!!"
         ipp_args = [cont, ruby_lambda_for_primitive(proc_bang.down).call(args_bang.down).up]
         ipp_proc = :"&&CALL"
 		  else
@@ -727,7 +733,7 @@ begin
       clauses = ex(:CLAUSES.up, f)
       env = ex(:ENV.up, f)
       cont = ex(:CONT.up, f)
-      ipp_args = [pcons(:BLOCK.up, clauses.rest)]
+      ipp_args = [Pair.pcons(:BLOCK.up, clauses.rest)]
       ipp_proc = :"&&NORMALISE"
 
     when :"&&COND"						# state clauses env cont
@@ -749,7 +755,7 @@ begin
       if first_condition_bang.down
         ipp_args = [clauses.first.second]
       else
-        ipp_args = [pcons(:COND.up, clauses.rest)]
+        ipp_args = [Pair.pcons(:COND.up, clauses.rest)]
       end
       ipp_proc = :"&&NORMALISE"
 
@@ -758,32 +764,44 @@ begin
       f = ipp_args[0]
       a = ipp_args[1..-1]
       
-      ipp_proc = ppp_type(f)
-      if ipp_proc != :"UNKNOWN"
-        ipp_args = a
-        next 
-      end
-
       ipp_proc = ppc_type(f)  
       if ipp_proc != :"UNKNOWN"
         ipp_args = [a.first, f]
         next
       end
 		
+      ipp_proc = ppp_type(f)
+      if ipp_proc != :"UNKNOWN"
+        ipp_args = a
+        next
+      end
+
+=begin
+# this corresponds to the "directly-implemented" case.
+# but since the primitives are already handled in &&ARGS-CONTINUTATION
+# and there are no otherwise directly-implemented things to use, coz this is Ruby
+# therefore, this case is unnecessary.
+
       if primitive?(f)
+      
+      puts "here! here! here!"
+      Process.exit
+      
         ipp_args = [reify_continuation(state), primitive_lambda(f).call(Rail.new(*a)).up] 
         state = shift_up(state)
         ipp_proc = :"&&CALL"
         next
       end
+=end
         
-      ipp_args = [f.body.up]
-      
+      # since f is neither PPP nor PPC, 
+      # skip the first 2 clauses of the cond of &&EXPAND-CLOSURE
+      # and dowhat the 3rd clause of the cond of &&EXPAND-CLOSURE does
+      ipp_args = [f.body.up]      
       env = f.environment.bind_pattern(f.pattern.up, Rail.new(*a).up)
       cont = reify_continuation(state)
       state = shift_up(state)
-
-      ipp_proc = :"&&NORMALISE" # this does what the 3rd clause of the cond of &&EXPAND-CLOSURE does
+      ipp_proc = :"&&NORMALISE" 
 		
     else
       raise_error(self, "Implementation error: control has left the IPP");

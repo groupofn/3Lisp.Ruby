@@ -1,17 +1,28 @@
 # encoding: UTF-8
 
+
+# TO DO: 
+# [ ] do not perform highlighting when caret is after a ';', i.e., in comment
+# [ ] ignore parens/brackets in comments during highlighting
+# [ ] do not perform matching when caret is after a ';' on the same line
+# [ ] ignore parens/brackets in comments during matching
+
+# [ ] Fix up the "->" hack
+# [ ] Deal with deletion of invisible characters
+# [ ] Change direct reference to instance variables to accessors
+
 class ExpReader
 
   def initialize
-    @lines = [""]  # initialized to one empty line
-    @row_pos = 0
-    @col_pos = 0  # starting from 0: inserts to the leftmost column 
-    @indent_unit = "  "
+    @lines = [""] # an Array of strings, each of which corresponds to a line; initialized to one empty line
+    @row_pos = 0  # row position of the caret in the current text-editing area of the terminal 
+    @col_pos = 0  # column position of the caret, starting from 0, which means inserting to the leftmost column 
+    @indent_unit = "  " # 2 space characters
   end
 
   def read_char 
     c = STDIN.getc.chr 
-    # gather next two characters of special keys 
+    # gather next two characters of special or "escape" keys 
     if (c=="\e") 
       extra_thread = Thread.new{ 
         c = c + STDIN.getc.chr 
@@ -25,7 +36,7 @@ class ExpReader
     
     return c
   end
-  
+
   def pair_highlight #  highlight the one before @col_pos
     if @col_pos > 0
       ch = @lines[@row_pos][@col_pos-1..@col_pos-1]
@@ -43,19 +54,21 @@ class ExpReader
               rights.pop
               
               if rights.empty?
-                print "\e7" # save cursor position
+                print "\e7" # save caret position
+
+                # move caret to the left of open paren
                 print "\e[#{@row_pos - row}A" if row < @row_pos
                 print "\e[#{col - @col_pos - 1}C" if col > @col_pos                
-                print "\e[#{@col_pos - col + 1}D" if col < @col_pos # to the left of open paren
+                print "\e[#{@col_pos - col + 1}D" if col < @col_pos 
               
-                print "\e[7m"
+                print "\e[7m" # reverse character foreground and background
                 print @lines[row][col-1..col-1]
-                print "\e[D"
+                print "\e[D"  # move caret one space to the left
                 sleep(0.2)
                 print "\e[m"
                 print @lines[row][col-1..col-1]
                 
-                print "\e8" # restore cursor position
+                print "\e8" # restore caret position
                 return            
               end
             end
@@ -75,18 +88,11 @@ class ExpReader
       if open_paren?(ch)
         lefts.push(ch)
       elsif close_paren?(ch)
-#        p lefts[-1]
-#        p ch
         return false if !pair_match?(lefts[-1], ch)
         lefts.pop
-#        p lefts
       end      
     }
     return lefts.length == 0
-  end
-  
-  def is_paren?(c)
-    c == "(" || c == "[" || c == ")" || c == "]"
   end
   
   def open_paren?(c)
@@ -118,8 +124,6 @@ class ExpReader
   end
   
   def delete_char(pos)
-    del_char = @lines[@row_pos][pos]
-
     @lines[@row_pos].slice!(pos)
     print @lines[@row_pos][pos..-1] + 
           " " + "\b" * (@lines[@row_pos].length - pos + 1)
@@ -141,10 +145,10 @@ class ExpReader
     begin
       # save previous state of stty 
       old_state = `stty -g` 
-      # disable echoing and enable raw (not having to press enter) 
+      # disable echoing and enable raw mode, under which characters are read in before pressing ENTER 
       system "stty raw -echo"
       
-      # do not buffer
+      # do not buffer on the OUTPUT side
       old_sync = STDOUT.sync
       STDOUT.sync = true
 
@@ -247,7 +251,7 @@ class ExpReader
           else
             print "\a"
           end
-        when "\003" # CTRL+c
+        when "\003" # CTRL+c quits the whole thing!
           print "\r\n"
           Process.exit
         when /^.$/ # "SINGLE CHAR"
@@ -256,7 +260,8 @@ class ExpReader
           
           insert_char(@col_pos, char) if char.length > 0
           pair_highlight
-#        else puts "SOMETHING ELSE: #{c.inspect}" # other escape sequence ignored
+######## other escape sequences are ignored
+#        else puts "SOMETHING ELSE: #{c.inspect}" 
         end
       end  
     rescue => ex 
@@ -272,7 +277,9 @@ class ExpReader
   end
 end
 
-#r = ExpReader.new
-#puts "\nRead: \n" + r.read 
-
+### Sample use of ExpReader ###
+#
+# r = ExpReader.new
+# res = r.read 
+# puts "\nRead: \n" +  res
 

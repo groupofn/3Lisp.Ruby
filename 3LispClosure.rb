@@ -1,10 +1,10 @@
 # encoding: UTF-8
 
 class Closure  
-  attr_reader :kind, :environment, :pattern, :body
+  attr_accessor :kind, :environment, :pattern, :body
 
   def initialize(kind, environment, pattern, body)
-    @kind, @environment, @pattern, @body = kind, environment, pattern, body
+    self.kind, self.environment, self.pattern, self.body = kind, environment, pattern, body
   end
   
   def replace(kind, environment, pattern, body)

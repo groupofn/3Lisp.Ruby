@@ -4,7 +4,7 @@ class Handle
   attr_accessor :quoted
 
   def initialize(struc)
-    @quoted = struc
+    self.quoted = struc
   end
 
   def to_s    
@@ -41,11 +41,11 @@ class Handle
   end
 
   def rplaca(new_car)
-    (quoted.car = new_car.down).up
+    quoted.rplaca(new_car.down).up
   end
 
   def rplacd(new_cdr)
-    (quoted.cdr = new_cdr.down).up
+    quoted.rplacd(new_cdr.down).up
   end
 # END Pair
 
@@ -103,7 +103,7 @@ class Handle
   
 # BEGIN Closure
   def rplacc(c)
-    quoted.replace(c.quoted.type, c.quoted.environment, c.quoted.pattern, c.quoted.body).up 
+    quoted.replace(c.quoted.kind, c.quoted.environment, c.quoted.pattern, c.quoted.body).up 
   end
 # END Closure
 

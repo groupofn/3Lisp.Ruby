@@ -6,11 +6,19 @@ class Pair
   attr_accessor :car, :cdr
 
   def initialize(car, cdr)
-    @car, @cdr = car, cdr
+    self.car, self.cdr = car, cdr
   end
 
   def self.pcons(h, t)
     Handle.new(Pair.new(h.down, t.down))
+  end
+
+  def rplaca(new_car)
+    self.car = new_car
+  end
+  
+  def rplacd(new_cdr)
+    self.cdr = new_cdr
   end
 
   def to_s
