@@ -1,0 +1,74 @@
+;;;;;; the 3-Lisp Reflective Processor Program  ;;;;;;
+
+(define READ-NORMALISE-PRINT
+  (lambda simple [level env]
+    (normalise (prompt&read level) env
+      (lambda simple [result]                         ; REPLY continuation
+         (block (prompt&reply result level)
+                (read-normalise-print level env))))))
+
+(define NORMALISE
+  (lambda simple [exp env cont]
+    (cond [(normal exp) (cont exp)]
+          [(atom exp) (cont (binding exp env))]
+          [(rail exp) (normalise-rail exp env cont)]
+          [(pair exp) (reduce (car exp) (cdr exp) env cont)])))
+
+(define REDUCE
+  (lambda simple [proc args env cont]
+    (normalise proc env
+      (lambda simple [proc!]                          ; PROC continuation
+        (if (reflective proc!)
+            (↓(de-reflect proc!) args env cont)
+            (normalise args env
+                       (lambda simple [args!]         ; ARGS continuation
+                         (if (primitive proc!)
+                             (cont ↑(↓proc! . ↓args!))
+                             (normalise (body proc!)
+                                        (bind (pattern proc!) args! (environment proc!))
+                                        cont)))))))))
+
+(define NORMALISE-RAIL
+  (lambda simple [rail env cont]
+    (if (empty rail)
+        (cont (rcons))
+        (normalise (1st rail) env
+                   (lambda simple [first!]            ; FIRST continuation
+                     (normalise-rail (rest rail) env
+                       (lambda simple [rest!]         ; REST continuation
+                         (cont (prep first! rest!)))))))))
+
+(define LAMBDA
+  (lambda reflect [[kind pattern body] env cont]
+    (cont (ccons kind env pattern body))))            ; env is normal form
+
+(define IF
+  (lambda reflect [[premise c1 c2] env cont]
+    (normalise premise env
+      (lambda simple [premise!]                       ; IF continuation
+        (normalise (ef ↓premise! c1 c2) env cont)))))        
+
+(define BLOCK
+  (lambda reflect [clauses env cont]
+    (if (unit clauses)
+        (normalise (1st clauses) env cont)
+        (normalise (1st clauses) env
+          (lambda simple []                           ; BLOCK continuation
+            (normalise (pcons 'block (rest clauses)) env cont)))))) 
+
+(define COND
+  (lambda reflect [clauses env cont]
+    (if (empty clauses)
+        (cont 'error)
+        (normalise (1st (1st clauses)) env
+          (lambda simple [1st-condition!]             ; COND continuation
+            (if ↓1st-condition!                       ; would ef work here? ... no! 
+                (normalise (2nd (1st clauses)) env cont)
+                (normalise (pcons 'cond (rest clauses)) env cont)))))))
+
+; the following should work, because it just bypasses the trapping and expansion of IF
+;            (normalise (ef ↓1st-condition!
+;		                    (2nd (1st clauses))
+;                           (pcons 'cond (rest clauses))) env cont))))))
+ 
+;;;;;; End of the RPP ;;;;;;
