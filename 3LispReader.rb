@@ -172,7 +172,7 @@ class ExpReader
             leading_space = @indent_unit * @row_pos
             @col_pos = leading_space.length
             print "\e[J" # clear below cursor
-            print "\r\n-> " + leading_space # "->" is more or less a hack!
+            print "\r\n- > " + leading_space # "- >" is more or less a hack!
             print "\e7" # save cursor position
             print newline_slice
             @lines.insert(@row_pos, leading_space + newline_slice)

@@ -98,7 +98,7 @@
 (unit 1)                    ; Error
 
 (foot [1 2 3])              ; => []
-(= foot [1 2 3] [])         ; $T
+(= (foot [1 2 3]) [])         ; $T
 (= (foot '[1 2 3]) '[])     ; $F
 (LET [[X (SCONS 10 20)]] 
   (BLOCK 
@@ -1105,7 +1105,7 @@ if
       (print arg) 
       (read-normalise-print 'debug
         (bind '[env cont return]
-              [↑env ↑cont ↑(lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
+              ↑[env cont (lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
               env)))))
 
 (define factorial-with-break-point 
