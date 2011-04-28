@@ -1,22 +1,38 @@
 # encoding: UTF-8
 
-class Closure  
-  attr_accessor :kind, :environment, :pattern, :body
+class Closure
+  include ThreeLispError
+  
+  attr_accessor :kind, :environment, :pattern, :body, :system_type, :name
 
-  def initialize(kind, environment, pattern, body)
-    self.kind, self.environment, self.pattern, self.body = kind, environment, pattern, body
+  def initialize(kind, environment, pattern, body, system_type = :Ordinary, name = nil)
+    self.kind, self.environment, self.pattern, self.body, self.system_type, self.name = kind, environment, pattern, body, system_type, name
   end
   
-  def replace(kind, environment, pattern, body)
-    self.kind, self.environment, self.pattern, self.body = kind, environment, pattern, body
+  def replace(other) # kernel and name are not mutable
+    self.kind, self.environment, self.pattern, self.body = other.kind, other.environment, other.pattern, other.body
   end
    
   def to_s
-    "{Closure: " + kind.to_s + " " + environment.to_s + " " + pattern.to_s + " " + body.to_s + "}"
+    "{" + (kernel? ? "Kernel" : system_type.to_s) + " closure: " +
+      kind.to_s + " " + (environment.nil? ? "#<>" : environment.to_s) + " " + pattern.to_s + " " + body.to_s + 
+    "}"
+  end
+
+  def kernel?
+    system_type == :Kernel_Utility || system_type == :PPP || system_type == :PPC
+  end
+
+  def primitive?
+    system_type == :Primitive  
+  end
+  
+  def ordinary?
+    system_type == :Ordinary
   end
 
   def simple?
-    kind == :SIMPLE 
+    kind == :SIMPLE
   end
   
   def reflective?
@@ -24,14 +40,6 @@ class Closure
   end
   
   def de_reflect
-    Closure.new(:SIMPLE, environment, pattern, body)
-  end
-  
-  def similar?(template)
-    return true if self.equal?(template)
-    return pattern.isomorphic(template.pattern) &&
-           body.isomorphic(template.body) &&
-           kind == template.kind && 
-           environment.similar?(template.environment)
+    Closure.new(:SIMPLE, environment, pattern, body, system_type, name)
   end
 end

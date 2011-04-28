@@ -103,7 +103,7 @@ class Handle
   
 # BEGIN Closure
   def rplacc(c)
-    quoted.replace(c.quoted.kind, c.quoted.environment, c.quoted.pattern, c.quoted.body).up 
+    quoted.replace(c.quoted).up 
   end
 # END Closure
 

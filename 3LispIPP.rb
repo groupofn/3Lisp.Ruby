@@ -61,7 +61,7 @@ def threeLisp
   oldtime = Time.now
   
   begin	
-  	ipp_proc = :"&&READ-NORMALISE-PRINT"
+  	ipp_proc = :"READ-NORMALISE-PRINT"
   	ipp_args = [] 	  # "arguments" passed among the && procs as an array; none to READ-NORMALISE-PRINT  	  	  
     env = GLOBAL_ENV 
     cont = nil
@@ -69,14 +69,14 @@ def threeLisp
   	until false do
   
     # print "level: "; p level
-    # if ipp_proc == :"&&NORMALISE"
-    #    print "ipp_proc: "; p ipp_proc; print "ipp_args: ["; 
-    #    ipp_args.each {|e| print "\n            "; print e; }; print "\n          ]\n\n" 
+    # if ipp_proc == :"NORMALISE"
+#        print "ipp_proc: "; p ipp_proc; print "ipp_args: ["; 
+#        ipp_args.each {|e| print "\n            "; print e; }; print "\n          ]\n\n" 
     #end	  
   
       case ipp_proc
   
-      when :"&&READ-NORMALISE-PRINT"		# state level env
+      when :"READ-NORMALISE-PRINT"		# state level env
         if initial_defs.length > 0
           ipp_args = [initial_defs.pop.up]
           library_just_loaded = true if initial_defs.length == 0
@@ -95,34 +95,34 @@ def threeLisp
     	    ipp_args = [prompt_and_read(level)] # initialize here!
         end
         cont = make_reply_continuation(level, env)
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
         oldtime = Time.now
   		
-  	  when :"&&REPLY-CONTINUATION"			# state result level env
+  	  when :"REPLY-CONTINUATION"			# state result level env
         result = ipp_args[0]
         f = ipp_args[1]
         level = ex(:LEVEL.up, f)
         env = ex(:ENV.up, f)
         prompt_and_reply(result, level)
-        ipp_proc = :"&&READ-NORMALISE-PRINT"
+        ipp_proc = :"READ-NORMALISE-PRINT"
   
   
-  	  when :"&&NORMALISE"               # state exp env cont
+  	  when :"NORMALISE"               # state exp env cont
         exp = ipp_args[0]
-        if exp.normal? then ipp_args = [cont, exp]; ipp_proc = :"&&CALL"
-        elsif exp.atom_d? then ipp_args = [cont, env.binding(exp)]; ipp_proc = :"&&CALL"
-        elsif exp.rail_d? then ipp_proc = :"&&NORMALISE-RAIL";
-        elsif exp.pair_d? then ipp_args = [exp.car, exp.cdr]; ipp_proc = :"&&REDUCE"
+        if exp.normal? then ipp_args = [cont, exp]; ipp_proc = :"CALL"
+        elsif exp.atom_d? then ipp_args = [cont, env.binding(exp)]; ipp_proc = :"CALL"
+        elsif exp.rail_d? then ipp_proc = :"NORMALISE-RAIL";
+        elsif exp.pair_d? then ipp_args = [exp.car, exp.cdr]; ipp_proc = :"REDUCE"
         else raise_error(self, "don't know how to noramlise #{exp}")
         end
   
-  	  when :"&&REDUCE"                  # state proc args env cont
+  	  when :"REDUCE"                  # state proc args env cont
         proc = ipp_args[0]; args = ipp_args[1]
         cont = make_proc_continuation(proc, args, env, cont)
         ipp_args = [proc]
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   		
-  	  when :"&&PROC-CONTINUATION"       # state proc! proc args env cont
+  	  when :"PROC-CONTINUATION"       # state proc! proc args env cont
         proc_bang = ipp_args[0]
         f = ipp_args[1]
         proc = ex(:PROC.up, f); args = ex(:ARGS.up, f)
@@ -133,14 +133,14 @@ def threeLisp
           raise_error(self, "function expected but was given #{proc_bang.down.to_s}!")
         elsif proc_bang.down.reflective?
           ipp_args = [proc_bang.down.de_reflect, args, env, cont]
-          ipp_proc = :"&&CALL"
+          ipp_proc = :"CALL"
         else
           cont = make_args_continuation(proc_bang, proc, args, env, cont)
           ipp_args = [args]
-          ipp_proc = :"&&NORMALISE"
+          ipp_proc = :"NORMALISE"
         end
   		
-      when :"&&ARGS-CONTINUATION"			# state args! proc! proc args env cont
+      when :"ARGS-CONTINUATION"			# state args! proc! proc args env cont
         args_bang = ipp_args[0]
         f = ipp_args[1]
         proc_bang = ex(:"PROC!".up, f); # proc = ex(:PROC.up, f); args = ex(:ARGS.up, f)
@@ -148,20 +148,20 @@ def threeLisp
         cont = ex(:CONT.up, f)
         if primitive?(proc_bang.down)
           ipp_args = [cont, ruby_lambda_for_primitive(proc_bang.down).call(args_bang.down).up]
-          ipp_proc = :"&&CALL"
+          ipp_proc = :"CALL"
   		  else
           ipp_args = [proc_bang, args_bang]
-          ipp_proc = :"&&EXPAND-CLOSURE"
+          ipp_proc = :"EXPAND-CLOSURE"
         end
   
-      when :"&&EXPAND-CLOSURE"				# state proc! args! cont
+      when :"EXPAND-CLOSURE"				# state proc! args! cont
         proc_bang = ipp_args[0]; args_bang = ipp_args[1]
-        if ppp_type(proc_bang.down) == :"&&NORMALISE" && plausible_arguments_to_normalise?(args_bang)
+        if ppp_type(proc_bang.down) == :"NORMALISE" && plausible_arguments_to_normalise?(args_bang)
           state.shift_down(cont)
           ipp_args = [args_bang.first.down]
           env = args_bang.second.down
           cont = args_bang.third.down
-          ipp_proc = :"&&NORMALISE"
+          ipp_proc = :"NORMALISE"
           next
         end
   		
@@ -174,21 +174,21 @@ def threeLisp
   		   
         ipp_args = [proc_bang.down.body.up]
         env = proc_bang.down.environment.bind_pattern(proc_bang.down.pattern.up, args_bang)
-        ipp_proc = :"&&NORMALISE"		
+        ipp_proc = :"NORMALISE"		
   
   
-      when :"&&NORMALISE-RAIL"				# state rail env cont
+      when :"NORMALISE-RAIL"				# state rail env cont
         rail = ipp_args[0]
         if rail.empty? then 
           ipp_args = [cont, rail]
-          ipp_proc = :"&&CALL"
+          ipp_proc = :"CALL"
         else 
           ipp_args = [rail.first]
           cont = make_first_continuation(rail, env, cont)
-          ipp_proc = :"&&NORMALISE"
+          ipp_proc = :"NORMALISE"
         end
   		
-      when :"&&FIRST-CONTINUATION"			# state first! rail env cont
+      when :"FIRST-CONTINUATION"			# state first! rail env cont
         first_bang = ipp_args[0]
         f = ipp_args[1]
         rail = ex(:RAIL.up, f);
@@ -197,31 +197,31 @@ def threeLisp
   
         cont = make_rest_continuation(first_bang, rail, env, cont)
         ipp_args = [rail.rest]
-        ipp_proc = :"&&NORMALISE-RAIL"
+        ipp_proc = :"NORMALISE-RAIL"
   		
-      when :"&&REST-CONTINUATION"			# state rest! first! rail env cont
+      when :"REST-CONTINUATION"			# state rest! first! rail env cont
         rest_bang = ipp_args[0]
         f = ipp_args[1]
         first_bang = ex(:"FIRST!".up, f)
         env = ex(:ENV.up, f)
         cont = ex(:CONT.up, f)
         ipp_args = [cont, rest_bang.prep(first_bang)]
-        ipp_proc = :"&&CALL"
+        ipp_proc = :"CALL"
   		
   		
-      when :"&&LAMBDA"						# state [kind pattern body] env cont
+      when :"LAMBDA"						# state [kind pattern body] env cont
         kind = ipp_args[0].first; pattern = ipp_args[0].second; body = ipp_args[0].third;
   
         ipp_args = [kind, Rail.new(env.up, pattern, body).up]
-        ipp_proc = :"&&REDUCE"
+        ipp_proc = :"REDUCE"
   
-      when :"&&IF"							# state [premise c1 c2] env cont
+      when :"IF"							# state [premise c1 c2] env cont
         premise = ipp_args[0].first; c1 = ipp_args[0].second; c2 = ipp_args[0].third
         cont = make_if_continuation(premise, c1, c2, env, cont)
         ipp_args = [premise]
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   
-      when :"&&IF-CONTINUATION"				# state premise! premise c1 c2 env cont
+      when :"IF-CONTINUATION"				# state premise! premise c1 c2 env cont
         premise_bang = ipp_args[0]; 
         f = ipp_args[1]
         c1 = ex(:C1.up, f)
@@ -231,35 +231,35 @@ def threeLisp
         
         raise_error(self, "IF expects a truth value but was give #{premise_bang.down}") if !premise_bang.down.boolean?
         ipp_args = [premise_bang.down ? c1 : c2]
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   
-      when :"&&BLOCK"						# state clauses env cont
+      when :"BLOCK"						# state clauses env cont
         clauses = ipp_args[0]
         if clauses.length != 1
           cont = make_block_continuation(clauses, env, cont)
         end
         ipp_args = [clauses.first]
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   
-      when :"&&BLOCK-CONTINUATION"			# state 1st-clause! clauses env cont
+      when :"BLOCK-CONTINUATION"			# state 1st-clause! clauses env cont
         f = ipp_args[1]
         clauses = ex(:CLAUSES.up, f)
         env = ex(:ENV.up, f)
         cont = ex(:CONT.up, f)
         ipp_args = [Pair.pcons(:BLOCK.up, clauses.rest)]
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   
-      when :"&&COND"						# state clauses env cont
+      when :"COND"						# state clauses env cont
         clauses = ipp_args[0]
         if clauses.empty?
           raise_error(self, "COND expects at least one clause");
         else
           ipp_args = [clauses.first.first]
           cont = make_cond_continuation(clauses, env, cont)
-          ipp_proc = :"&&NORMALISE"
+          ipp_proc = :"NORMALISE"
         end
   
-      when :"&&COND-CONTINUATION"			# state 1st-condition! clauses env cont
+      when :"COND-CONTINUATION"			# state 1st-condition! clauses env cont
         first_condition_bang = ipp_args[0]
         f = ipp_args[1]
         clauses = ex(:CLAUSES.up, f)
@@ -270,10 +270,10 @@ def threeLisp
         else
           ipp_args = [Pair.pcons(:COND.up, clauses.rest)]
         end
-        ipp_proc = :"&&NORMALISE"
+        ipp_proc = :"NORMALISE"
   
   		
-      when :"&&CALL"						# state f a
+      when :"CALL"						# state f a
         f = ipp_args[0]
         a = ipp_args[1..-1]
         
@@ -292,7 +292,7 @@ def threeLisp
         ipp_args = [f.body.up]      
         env = f.environment.bind_pattern(f.pattern.up, Rail.new(*a).up)
         cont = state.shift_up {|new_level| make_reply_continuation(new_level, GLOBAL_ENV)} 
-        ipp_proc = :"&&NORMALISE" 
+        ipp_proc = :"NORMALISE" 
   		
       else
         raise_error(self, "Implementation error: control has left the IPP");

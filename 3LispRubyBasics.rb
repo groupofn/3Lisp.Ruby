@@ -163,26 +163,4 @@ class Object
       raise_error(self, "equality undefined for #{self.to_s} and #{other.to_s}")
     end
   end  
-
-  def isomorphic(other)
-    return false if struc_type != other.struc_type
-    return true if self.equal?(other)
-    
-    case struc_type
-    when :PAIR
-      return self.car.isomorphic(other.car) && self.cdr.isomorphic(other.cdr)
-    when :RAIL
-      return false if length != other.length
-      self.zip(other).each {|dbl| return false if !dbl.first.isomorphic(dbl.second)}
-      return true
-    when :HANDLE
-      return self.down.isomorphic(other.down)
-    when :CLOSURE
-      return self.kind == other.kind &&
-             self.pattern.isomorphic(other.pattern) &&
-             self.body.isomorphic(other.body) &&
-             self.environment.similar?(other.environment)
-    end    
-    return false
-  end
 end

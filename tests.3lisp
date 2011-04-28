@@ -699,7 +699,7 @@ z                                   ; => '[THREE]
 
 ;;; System Utilities
 
-(version)             ; => "3Lisp version R00, April 15, 2011"
+(version)             ; => "3Lisp version R01, April 28, 2011"
 
 
 ;;; Other General Utilities
@@ -885,6 +885,7 @@ z                                   ; => '[THREE]
     (lambda simple [self]
       (lambda simple [n]
         (if (= n 0) 1 (* n (self (1- n))))))))
+(factorial 10)
 
 (define DEFEIN
   (lambda macro [label form]
@@ -895,7 +896,6 @@ z                                   ; => '[THREE]
   (if (zero n)
       1
       (* n (fact (1- n))))))
-
 (fact 10)
 
 ;;;;;;;;;;;;;
@@ -1146,7 +1146,7 @@ if
 
 ((lambda simple [x y]  
    (normalise '[x x y y] global alpha))
-3 4)
+3 4)                                          ; Error
 
 ((lambda simple [x y]  ;; this is a correct one ...
    (normalise '[+ - * /] global alpha))

@@ -54,6 +54,8 @@ module ThreeLispPrimitives
         args.first.rplaca(args.second.car)
         args.first.rplacd(args.second.cdr)
       when :CLOSURE
+        raise_error(self, "Kernel closure cannot be changed") if args.first.quoted.kernel?
+        raise_error(self, "Primitive closure cannot be changed") if args.first.quoted.primitive?
         args.first.rplacc(args.second)
       end
       return Handle.new(:OK) }],
@@ -72,10 +74,6 @@ module ThreeLispPrimitives
         end
       end  
       return true }],
-
-    [:ISOMORPHIC, :SIMPLE, Rail.new(:e1, :e2), lambda{|args|
-      raise_error(self, "ISOMORPHIC expects 2 arguments") if args.length != 2
-      args.first.isomorphic(args.second) }],
 
     [:ACONS, :SIMPLE, :args, lambda{|args|
       begin
@@ -243,11 +241,10 @@ module ThreeLispPrimitives
     [:"BOUND-ATOMS", :SIMPLE, Rail.new(:env), lambda{|args|
       raise_error(self, "BOUND expects an environment but was given #{args.first.to_s}") if !args.first.environment?
       args.first.bound_atoms }], # returns a sequence of atom designators
-    [:"SIMILAR-ENVIRONMENT", :SIMPLE, Rail.new(:env1, :env2), lambda{|args|
-      args.first.similar?(args.second) }] # this one no longer needs to be a primitive!
   ]
 
   PRIMITIVE_RUBY_LAMBDAS = Hash[PRIMITIVES.map {|p| [p[0], p[3]] }]
+  
   def ruby_lambda_for_primitive(closure)
     PRIMITIVE_RUBY_LAMBDAS[closure.body]
   end
@@ -255,7 +252,7 @@ module ThreeLispPrimitives
   PRIMITIVE_BINDINGS = {}
   PRIMITIVES.map { |p| 
     # these are circular closures: quoted atoms used as the body
-    PRIMITIVE_BINDINGS[p[0].up] = Closure.new(p[1], nil, p[2], p[0]).up # defining env is empty
+    PRIMITIVE_BINDINGS[p[0].up] = Closure.new(p[1], nil, p[2], p[0], :Primitive, p[0]).up # defining env is empty
   }
 
   PRIMITIVE_CLOSURES = PRIMITIVES.map {|p| PRIMITIVE_BINDINGS[p[0].up] }

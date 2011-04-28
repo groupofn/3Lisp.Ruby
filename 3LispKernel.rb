@@ -3,10 +3,7 @@
 require './3LispInternaliser.rb'
 
 module ThreeLispKernel
-  $ppc_t_a = Handle.new(:"\?")  # ppc template argument
-  PPP_TABLE = []
   PPC_TEMPLATES = {}
-  PPC_TABLE = []
     
   KERNEL_UTILITY_PARTS = [
     [:"1ST", :SIMPLE, Rail.new(:VEC), "(nth 1 vec)"],
@@ -82,7 +79,7 @@ module ThreeLispKernel
 
   def initialize_kernel_utilities(env, parser)
     KERNEL_UTILITY_PARTS.each {|e|
-      env.rebind_one(e[0].up, Closure.new(e[1], env, e[2], parser.parse(e[3]).first).up)
+      env.rebind_one(e[0].up, Closure.new(e[1], env, e[2], parser.parse(e[3]).first, :Kernel_Utility, e[0]).up)
     }
   end
 
@@ -182,15 +179,14 @@ module ThreeLispKernel
   def initialize_ppp_table(env, parser)
     RPP_PROC_PARTS.keys.each {|name|
       parts = RPP_PROC_PARTS[name]
-      closure = Closure.new(parts[0], env, parts[1], parser.parse(parts[2]).first)
+      closure = Closure.new(parts[0], env, parts[1], parser.parse(parts[2]).first, :PPP, name)
       env.rebind_one(name.up, closure.up)
-      PPP_TABLE.push([("&&" + name.to_s).to_sym, closure.reflective? ? closure.de_reflect : closure])
     }
   end 
       
   RAW_PPC_TEMPLATES =
   {
-    :"&&REPLY-CONTINUATION"=> [
+    :"REPLY-CONTINUATION"=> [
       Rail.new(:LEVEL, :ENV), 
       Rail.new(:"RESULT"),
       "
@@ -199,7 +195,7 @@ module ThreeLispKernel
       "
     ],
   
-    :"&&PROC-CONTINUATION" => [
+    :"PROC-CONTINUATION" => [
       Rail.new(:PROC, :ARGS, :ENV, :CONT),
       Rail.new(:"PROC!"),
       "
@@ -217,7 +213,7 @@ module ThreeLispKernel
       "
     ],
       
-    :"&&ARGS-CONTINUATION" => [
+    :"ARGS-CONTINUATION" => [
       Rail.new(:"PROC!", :PROC, :ARGS, :ENV, :CONT),
       Rail.new(:"ARGS!"),
       "
@@ -231,7 +227,7 @@ module ThreeLispKernel
       "
     ],
       
-    :"&&FIRST-CONTINUATION" => [
+    :"FIRST-CONTINUATION" => [
       Rail.new(:RAIL, :ENV, :CONT),
       Rail.new(:"FIRST!"),
       "
@@ -241,7 +237,7 @@ module ThreeLispKernel
      "
     ],
       
-    :"&&REST-CONTINUATION" => [
+    :"REST-CONTINUATION" => [
       Rail.new(:"FIRST!", :RAIL, :ENV, :CONT),
       Rail.new(:"REST!"),
       "
@@ -249,7 +245,7 @@ module ThreeLispKernel
       "
     ],
       
-    :"&&IF-CONTINUATION" => [
+    :"IF-CONTINUATION" => [
       Rail.new(:PREMISE, :C1, :C2, :ENV, :CONT),
       Rail.new(:"PREMISE!"),
       "
@@ -257,7 +253,7 @@ module ThreeLispKernel
       "
     ],
       
-    :"&&BLOCK-CONTINUATION" => [
+    :"BLOCK-CONTINUATION" => [
       Rail.new(:CLAUSES, :ENV, :CONT),
       :"\?", # no arguments
       "
@@ -265,7 +261,7 @@ module ThreeLispKernel
       "
     ],
       
-    :"&&COND-CONTINUATION" => [
+    :"COND-CONTINUATION" => [
       Rail.new(:CLAUSES, :ENV, :CONT),
       Rail.new(:"1st-condition!"),
       "
@@ -279,22 +275,8 @@ module ThreeLispKernel
   def initialize_ppc_templates_and_table(env, parser)
     RAW_PPC_TEMPLATES.keys.each {|name|
       parts = RAW_PPC_TEMPLATES[name]
-      PPC_TEMPLATES[name] = [parts[0], Closure.new(:SIMPLE, env, parts[1], parser.parse(parts[2]).first)]
+      PPC_TEMPLATES[name] = [parts[0], Closure.new(:SIMPLE, env, parts[1], parser.parse(parts[2]).first, :KERNEL, name)]
     }
-
-    [
-      [:"&&PROC-CONTINUATION", make_proc_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&ARGS-CONTINUATION", make_args_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&FIRST-CONTINUATION", make_first_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&REST-CONTINUATION", make_rest_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&REPLY-CONTINUATION", make_reply_continuation($ppc_t_a, $ppc_t_a)],
-      [:"&&IF-CONTINUATION", make_if_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&BLOCK-CONTINUATION", make_block_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
-      [:"&&COND-CONTINUATION", make_cond_continuation($ppc_t_a, $ppc_t_a, $ppc_t_a)],
-    ].each {|e|
-      PPC_TABLE.push(e)
-    }
-    
   end
   
   def make_rpp_continuation(cont_name, args)
@@ -302,90 +284,63 @@ module ThreeLispKernel
     Closure.new(template[1].kind, 
                 template[1].environment.bind_pattern(template[0].up, args.up), 
                 template[1].pattern,
-                template[1].body)
+                template[1].body,
+                :PPC,
+                cont_name)
   end  
     
   def make_reply_continuation(level, env)
     local_args = Rail.new(level, env)
-    make_rpp_continuation(:"&&REPLY-CONTINUATION", local_args)
+    make_rpp_continuation(:"REPLY-CONTINUATION", local_args)
   end
     
   def make_proc_continuation(proc, args, env, cont)
     local_args = Rail.new(proc, args, env, cont)
-    make_rpp_continuation(:"&&PROC-CONTINUATION", local_args)
+    make_rpp_continuation(:"PROC-CONTINUATION", local_args)
   end
   
   def make_args_continuation(proc_bang, proc, args, env, cont)
     local_args = Rail.new(proc_bang, proc, args, env, cont)
-    make_rpp_continuation(:"&&ARGS-CONTINUATION", local_args)
+    make_rpp_continuation(:"ARGS-CONTINUATION", local_args)
   end
     
   def make_first_continuation(rail, env, cont)
     local_args = Rail.new(rail, env, cont)
-    make_rpp_continuation(:"&&FIRST-CONTINUATION", local_args)
+    make_rpp_continuation(:"FIRST-CONTINUATION", local_args)
   end
     
   def make_rest_continuation(first_bang, rail, env, cont)
     local_args = Rail.new(first_bang, rail, env, cont)
-    make_rpp_continuation(:"&&REST-CONTINUATION", local_args)
+    make_rpp_continuation(:"REST-CONTINUATION", local_args)
   end
     
   def make_if_continuation(premise, c1, c2, env, cont)
     local_args = Rail.new(premise, c1, c2, env, cont)
-    make_rpp_continuation(:"&&IF-CONTINUATION", local_args)
+    make_rpp_continuation(:"IF-CONTINUATION", local_args)
   end
     
   def make_block_continuation(clauses, env, cont)
     local_args = Rail.new(clauses, env, cont)
-    make_rpp_continuation(:"&&BLOCK-CONTINUATION", local_args)
+    make_rpp_continuation(:"BLOCK-CONTINUATION", local_args)
   end
     
   def make_cond_continuation(clauses, env, cont)
     local_args = Rail.new(clauses, env, cont)
-    make_rpp_continuation(:"&&COND-CONTINUATION", local_args)
+    make_rpp_continuation(:"COND-CONTINUATION", local_args)
   end
   
   def ex(variable, closure)
     closure.environment.binding(variable).down
   end
   
-  def identify_closure(closure, table)
-    table.each {|c| 
-      return c[0] if closure.similar?(c[1]) 
-    }
-  	
-  	return :UNKNOWN
-  end
-    
   def ppp_type(closure)
-    identify_closure(closure, PPP_TABLE)
+    return closure.name if closure.system_type == :PPP
+    return :UNKNOWN
   end
     
   def ppc_type(closure)
-=begin
-    PPC_TABLE.each {|c| 
-
-    if closure.similar?(c[1])
-      print "object_id: " + closure.object_id.to_s + " vs. " + c[1].object_id.to_s
-      puts
-      print "kind: " + closure.kind.object_id.to_s + " vs. " + c[1].kind.object_id.to_s
-      puts
-      print "environment: " + closure.environment.object_id.to_s + " vs. " + c[1].environment.object_id.to_s
-      puts
-      print "pattern: " + closure.pattern.object_id.to_s + " vs. " + c[1].pattern.object_id.to_s
-      puts
-      print "body: " + closure.body.object_id.to_s + " vs. " + c[1].body.object_id.to_s
-      puts
-      print closure.to_s + "\n"
-      print c[1].to_s + "\n"
-      puts
-      
-      return c[0]
-    end
-    }
-  	return :UNKNOWN
-=end
-    identify_closure(closure, PPC_TABLE)
+    return closure.name if closure.system_type == :PPC
+    return :UNKNOWN
   end
   
   def plausible_arguments_to_a_continuation?(args_bang)

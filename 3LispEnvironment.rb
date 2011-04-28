@@ -117,27 +117,4 @@ protected
       puts "~~ Stopped at level #{current} ~~\n\n"
     end
   end
-  
-public
-  # see page 277 of Implementation paper
-  # this could be slower than a rail implementation
-  def similar?(template)  
-    return true if self.equal?(template)
-    
-    self_keys = local.keys
-    template_keys = template.local.keys
-
-    return false if self_keys.length != template_keys.length
-    
-    self_keys.zip(template_keys).each { |key_pair|
-	    return false if key_pair[0] != key_pair[1]
-      
-      if template.local[key_pair[1]].down != $ppc_t_a # :"''?" # try with a global variable of :"''?" to see whether it's faster
-         return false if !(local[key_pair[0]].eq?(template.local[key_pair[1]])) # should be eq?, rather than ==
-      end
-    }
-    
-	  return true if tail.empty? && template.tail.empty?
-	  tail.similar?(template.tail)
-  end
 end

@@ -59,7 +59,7 @@
   global)
 
 (define version
-  (lambda simple [] "3Lisp version R00, April 15, 2011"))
+  (lambda simple [] "3Lisp version R01, April 28, 2011"))
 
 (define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
 ;(define DOUBLE (lambda simple [vec] (and (not (empty vec)) (unit (rest vec))))) ; Manual version: slow on short vectors
@@ -310,6 +310,35 @@
 ;          [$T (member element (rest vector))])))
 
 ; isomorphic is primitive for now ...
+
+(define isomorphic
+  (lambda simple [e1 e2]
+    (cond [(not (= (type e1) (type e2))) $F]
+          [(= e1 e2) $T]
+          [(rail e1)
+           (or (and (empty e1) (empty e2))
+               (and (not (empty e1))
+                    (not (empty e2))
+                    (isomorphic (1st e1) (1st e2))
+                    (isomorphic (rest e1) (rest e2))))]
+          [(pair e1)
+           (and (isomorphic (car e1) (car e2))
+                (isomorphic (cdr e1) (cdr e2)))]
+          [(closure e1)
+           (and (isomorphic (procedure-type e1)
+                            (procedure-type e2))
+                (isomorphic (pattern e1) (pattern e2))
+                (isomorphic (body e1) (body e2))
+                (isomorphic (environment-designator e1)
+                            (environment-designator e2)))]
+          [(handle e1) (isomorphic ↓e1 ↓e2)]
+          [(environment e1) 
+           (do [[e1-atoms (bound-atoms e1) (rest e1-atoms)] 
+                [e2-atoms (bound-atoms e2) (rest e2-atoms)]]
+               [[(empty e1-atoms) $T] 
+                [(not (isomorphic (1st e1-atoms) (1st e2-atoms))) $F]
+                [(not (isomorphic (binding (1st e1-atoms) e1) (binding (1st e2-atoms) e2))) $F]])]
+          [$T $F])))
 
 
 (define INDEX
