@@ -161,7 +161,7 @@ module ThreeLispKernel
   					     (normalise (pcons 'block (rest clauses)) env cont))))
       "
     ],
-  
+
     :"COND" => [
       :REFLECT, Rail.new(:CLAUSES, :ENV, :CONT),
       "
@@ -175,6 +175,7 @@ module ThreeLispKernel
       "
     ]
   }
+
   
   def initialize_ppp_table(env, parser)
     RPP_PROC_PARTS.keys.each {|name|

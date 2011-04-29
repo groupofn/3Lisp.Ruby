@@ -72,22 +72,70 @@ protected
     if pattern.atom_d?
       newbindings[pattern] = args
     else
+=begin slower version -- using map 
       pattern = pattern.down.map(&:up) if pattern.rail_d?
       if args.handle?
         if args.rail_d?
-          args = args.down.map(&:up) if args.rail_d?
+          args = args.down.map(&:up) 
         elsif args.down.rail_d?
-          args = args.down.down.map{|element| element.up.up} if args.down.rail_d?
+          args = args.down.down.map{|element| element.up.up}
+        end
+      end
+      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
+      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
+
+      al = args.length; pl = pattern.length
+      raise_error(self, "too many arguments") if al > pl
+      raise_error(self, "too few arguments") if al < pl
+
+      for i in 1..al
+        bind_pattern_helper(newbindings, pattern.nth(i), args.nth(i))
+      end
+=end
+
+# BEGIN faster version -- avoiding map 
+      if pattern.rail_d?
+        pattern = pattern.down
+        root = nr = Rail.new
+        while !pattern.empty?
+          nr.element = pattern.element.up
+          nr.remaining = Rail.new
+          nr = nr.remaining
+          pattern = pattern.remaining
+        end
+        pattern = root
+      end
+
+      if args.handle?
+        if args.rail_d?
+          args = args.down
+          root = nr = Rail.new
+          while !args.empty?
+            nr.element = args.element.up
+            nr.remaining = Rail.new 
+            nr = nr.remaining
+            args = args.remaining
+          end
+          args = root
+        elsif args.down.rail_d?
+          args = args.down.down
+          root = nr = Rail.new
+          while !args.empty?
+            nr.element = args.element.up.up
+            nr.remaining = Rail.new 
+            nr = nr.remaining
+            args = args.remaining
+          end
+          args = root
         end
       end
 
-      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
-      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
-      raise_error(self, "too many arguments") if args.length > pattern.length
-      raise_error(self, "too few arguments") if args.length < pattern.length
-
-      pattern.zip(args).each{|dbl| bind_pattern_helper(newbindings, dbl.first, dbl.second) }  
+      while !args.empty?
+        bind_pattern_helper(newbindings, pattern.element, args.element)
+        args = args.remaining; pattern = pattern.remaining
+      end
     end 
+# END faster version
 
     newbindings
   end

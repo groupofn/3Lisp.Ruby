@@ -157,7 +157,16 @@ class Object
     when :RAIL
 	    return false if other.struc_type != :RAIL
       return false if length != other.length
-      zip(other).each{|dbl| return false if !dbl.first.eq?(dbl.second) }
+# BEGIN slower version -- using zip & each
+#      zip(other).each{|dbl| return false if !dbl.first.eq?(dbl.second) }
+# END slower version
+# BEGIN faster version -- avoiding zip & each
+      s = self; o = other
+      while !o.empty?
+        return false if !s.element.eq?(o.element);
+        s = s.remaining; o = o.remaining 
+      end
+# END faster version
       return true
     else
       raise_error(self, "equality undefined for #{self.to_s} and #{other.to_s}")

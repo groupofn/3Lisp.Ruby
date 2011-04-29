@@ -595,7 +595,25 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Special Utilities  
+;;
 
+;; create the load and edit stuff as in the manual 
+
+(define edex
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (edre . ↓args) env id))))
+
+(define edex
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (edre . ↓args) env id))))
+
+;;
+;; 
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

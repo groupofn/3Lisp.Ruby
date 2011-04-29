@@ -8,6 +8,61 @@ module ThreeLispPrimitives
     [:EXIT, :SIMPLE, Rail.new, lambda {|args| Process.exit }],
     [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
       raise_error(self, "3-Lisp run-time error: " + args.first.to_s + "\n") }],
+    
+    [:SYSTEM, :SIMPLE, Rail.new(:command), lambda{|args|
+      raise_error(self, "SYSTEM expects a command string") if !args.first.string?
+      if system(args.first)
+        return Handle.new(:OK) 
+      end
+
+      raise_error(self, "System command " + args.first + " failed with exit status " + $?.to_i.to_s)
+    }],
+    
+    [:EDRE, :SIMPLE, Rail.new(:"editor filename"), lambda{|args|
+      filename = "temp.3lisp"
+      editor = "vi"
+
+      if !args.empty?
+        if args.length == 1
+          raise_error(self, "SYSTEM expects a file name but was given #{args.first.to_s}") if !args.first.string?
+          filename = args.first        
+          editor = "vi"
+        elsif args.length == 2
+          raise_error(self, "SYSTEM expects an editor name but was given #{args.first.to_s}") if !args.first.string? 
+          raise_error(self, "SYSTEM expects a file name but was given #{args.first.to_s}") if !args.second.string? 
+          editor = args.first
+          filename = args.second        
+        else
+          raise_error(self, "Usage: (edex), (edex file), or (edex editor file)") 
+        end
+      end
+      
+      if system(editor + " " + filename)      
+=begin      
+        stdin_num = $stdin.fileno
+#        puts "stdin fileno is: #{stdin_num}"
+        save_stdin = $stdin.clone
+        begin
+          stin = IO.new(stdin_num,"w")
+          stin.puts `cat #{filename}`
+        rescue
+          puts "got #{$!}"
+        end
+        $stdin.reopen(save_stdin) 
+        return Handle.new(:OK) 
+=end
+        parsed = $parser.parse(IO.read(filename))
+        if parsed.empty?
+          return Handle.new(:ERROR) 
+        end
+        
+        return parsed.up
+      end
+
+      raise_error(self, "System command " + args.first + " failed with exit status " + $?.to_i.to_s)
+    }],
+    
+    
     [:READ, :SIMPLE, :args, lambda{|args|
       raise_error(self, "READ expects a structure but was given #{args.first.to_s}") if !args.first.handle?
       code = nil

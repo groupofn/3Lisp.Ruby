@@ -55,7 +55,6 @@ def threeLisp
  
   library_just_loaded = false
 
-#  initial_defs.each{|e| p e}
   $stdout = File.open("/dev/null", "w")
   
   oldtime = Time.now
@@ -90,7 +89,7 @@ def threeLisp
           elapsed = Time.now - oldtime
   
           # uncomment the following line to get time for each interaction
-          # p elapsed
+           p elapsed
                   
     	    ipp_args = [prompt_and_read(level)] # initialize here!
         end
@@ -156,7 +155,7 @@ def threeLisp
   
       when :"EXPAND-CLOSURE"				# state proc! args! cont
         proc_bang = ipp_args[0]; args_bang = ipp_args[1]
-        if ppp_type(proc_bang.down) == :"NORMALISE" && plausible_arguments_to_normalise?(args_bang)
+        if ppp_type(proc_bang.down) == :"NORMALISE" # && plausible_arguments_to_normalise?(args_bang)
           state.shift_down(cont)
           ipp_args = [args_bang.first.down]
           env = args_bang.second.down
@@ -166,7 +165,7 @@ def threeLisp
         end
   		
         ipp_proc = ppc_type(proc_bang.down)
-        if ipp_proc != :"UNKNOWN" && plausible_arguments_to_a_continuation?(args_bang)
+        if ipp_proc != :"UNKNOWN" # && plausible_arguments_to_a_continuation?(args_bang)
           state.shift_down(cont)
           ipp_args = [args_bang.first.down, proc_bang.down]
   		    next
@@ -206,8 +205,7 @@ def threeLisp
         env = ex(:ENV.up, f)
         cont = ex(:CONT.up, f)
         ipp_args = [cont, rest_bang.prep(first_bang)]
-        ipp_proc = :"CALL"
-  		
+        ipp_proc = :"CALL"  		
   		
       when :"LAMBDA"						# state [kind pattern body] env cont
         kind = ipp_args[0].first; pattern = ipp_args[0].second; body = ipp_args[0].third;
