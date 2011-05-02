@@ -602,13 +602,27 @@
 
 ;; create the load and edit stuff as in the manual 
 
-(define edex
-  (lambda reflect [args env cont]
-    (cont (normalise-rail (edre . ↓args) env id))))
+(define edit
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (sys editor file))))
 
+(define editsource
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (block 
+        (sys editor file) 
+        (source file)))))
+  
 (define edex
   (lambda reflect [args env cont]
-    (cont (normalise-rail (edre . ↓args) env id))))
+    (cont (normalise-rail (parse (editsource . ↓args)) env id))))
+
+(define exec
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (source . ↓args)) env id))))
 
 ;;
 ;; 

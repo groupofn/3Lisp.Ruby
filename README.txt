@@ -1,3 +1,44 @@
+Thoughts on primitives related to editing, reading and parsing of files:
+
+[1] (system "..." "...") => returns STDOUT as a string.
+
+[1.1] SOURCE ... PRIMITIVE
+
+[2] (parse "...") => a rail of expressions/structures
+         
+[3] EDIT
+
+(define edit
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (system editor file))))
+
+(define editsource
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (block 
+        (system editor file) 
+        (source file)))))
+  
+[4] EDEX
+
+(define edex
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (editsource . ↓args)) env id))))
+
+(define edex
+- >     (lambda reflect [args env cont]
+- >         (cont (normalise-rail (edre . ↓args) env id))))
+
+
+[5] EDITDEF
+
+generate formatted to_s from closure or other structure ... i.e. pretty print.
+use editor to edit it ...; change definition ...
+
+
                      3Lisp - Ruby Implementation
 
                            2011-03-12

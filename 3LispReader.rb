@@ -2,21 +2,28 @@
 
 
 # TO DO: 
-# [ ] do not perform highlighting when caret is after a ';', i.e., in comment
-# [ ] ignore parens/brackets in comments during highlighting
-# [ ] do not perform matching when caret is after a ';' on the same line
-# [ ] ignore parens/brackets in comments during matching
+# [x] do not perform highlighting when caret is after a ';', i.e., in comment
+# [x] ignore parens/brackets in comments during highlighting
+# [x] do not perform matching when caret is after a ';' on the same line
+# [x] ignore parens/brackets in comments during matching
+# [ ] history
+# [ ] page-up; page-down; home; end
 
-# [ ] Fix up the "->" hack
+# [ ] Fix up the "- >" hack
 # [ ] Deal with deletion of invisible characters
 # [ ] Change direct reference to instance variables to accessors
 
 class ExpReader
 
   def initialize
+    @history = 
+  
     @lines = [""] # an Array of strings, each of which corresponds to a line; initialized to one empty line
     @row_pos = 0  # row position of the caret in the current text-editing area of the terminal 
     @col_pos = 0  # column position of the caret, starting from 0, which means inserting to the leftmost column 
+
+    @comment_starts = [1] # col_pos of semicolon on a line; for a line without a semicolon, it's set to length_of_line;
+    
     @indent_unit = "  " # 2 space characters
   end
 
@@ -25,6 +32,7 @@ class ExpReader
     # gather next two characters of special or "escape" keys 
     if (c=="\e") 
       extra_thread = Thread.new{ 
+        c = c + STDIN.getc.chr 
         c = c + STDIN.getc.chr 
         c = c + STDIN.getc.chr 
       } 
@@ -38,7 +46,7 @@ class ExpReader
   end
 
   def pair_highlight #  highlight the one before @col_pos
-    if @col_pos > 0
+    if @col_pos > 0 && @col_pos-1 < @comment_starts[@row_pos]
       ch = @lines[@row_pos][@col_pos-1..@col_pos-1]
       if close_paren?(ch)  # close_paren
         rights = [ch]
@@ -75,7 +83,7 @@ class ExpReader
             col -= 1
           end
           row -= 1
-          col = @lines[row].length if row >= 0
+          col = @comment_starts[row] if row >= 0
         end
       end
     end
@@ -84,7 +92,12 @@ class ExpReader
   def parens_match?
     lefts = []
     
-    @lines.join.each_char{|ch|
+    code = ""
+    for i in 0..@lines.length-1
+      code << @lines[i][0..@comment_starts[i]-1]
+    end
+    
+    code.each_char{|ch|
       if open_paren?(ch)
         lefts.push(ch)
       elsif close_paren?(ch)
@@ -116,15 +129,26 @@ class ExpReader
     end
   end
 
-  def insert_char(pos, ch)
+  def update_comment_start_of_line(row) 
+    new_pos = @lines[row] =~ /;/
+    if new_pos.nil?
+      @comment_starts[row] = @lines[row].length
+    else
+      @comment_starts[row] = new_pos
+    end
+  end
+
+  def insert_char(ch)
     @lines[@row_pos].insert(@col_pos, ch)
+    update_comment_start_of_line(@row_pos)    
     print @lines[@row_pos][@col_pos..-1] +
           "\b" * (@lines[@row_pos].length - @col_pos - 1)
     @col_pos += ch.length
   end
   
   def delete_char(pos)
-    @lines[@row_pos].slice!(pos)
+    ch = @lines[@row_pos].slice!(pos)
+    update_comment_start_of_line(@row_pos)
     print @lines[@row_pos][pos..-1] + 
           " " + "\b" * (@lines[@row_pos].length - pos + 1)
   end
@@ -134,7 +158,9 @@ class ExpReader
     print "\e[J" # clear the "residue" lines
     print @lines[@row_pos+1] + "\r\n"
     @lines[@row_pos] << @lines[@row_pos + 1]
+    update_comment_start_of_line(@row_pos)
     @lines.delete_at(@row_pos+1)
+    @comment_starts.delete_at(@row_pos+1)
     @lines[@row_pos+1..-1].each{|line|
       print line + "\r\n"
     }
@@ -163,7 +189,8 @@ class ExpReader
           print "\r\n... abandoning edits ...\r\n"
           return ""
         when "\n", "\r"
-          if @row_pos == @lines.length - 1 && parens_match?
+          if @row_pos == @lines.length - 1 && @col_pos == @lines[@lines.length-1].length && parens_match?
+            insert_char(char)
             exp_incomplete = false
             print "\r\n"
           else
@@ -176,12 +203,22 @@ class ExpReader
             print "\e7" # save cursor position
             print newline_slice
             @lines.insert(@row_pos, leading_space + newline_slice)
-            @lines[@row_pos+1..-1].each{|line|
-              print "\r\n" + line
-            }
+            update_comment_start_of_line(@row_pos)
+            for i in @row_pos+1..-1
+              print "\r\n" + @lines[i]
+              update_comment_start_of_line(i)
+            end
             print "\e8" # restore cursor position
             print "\e[A" if @row_pos < @lines.length - 1 # correct for scrolling
           end
+        when "\e[H"
+          puts "home!"
+        when "\e[F"
+          puts "end!"
+        when "\e[6~"
+          puts "page down!"
+        when "\e[5~"
+          puts "page up!"
         when "\e[A" # "UP ARROW"
           if @row_pos > 0
             @row_pos -= 1
@@ -255,10 +292,9 @@ class ExpReader
           print "\r\n"
           Process.exit
         when /^.$/ # "SINGLE CHAR"
-          # if paren, then check ... 
           char = @indent_unit if char == "\t"
           
-          insert_char(@col_pos, char) if char.length > 0
+          insert_char(char) if char.length > 0
           pair_highlight
 ######## other escape sequences are ignored
 #        else puts "SOMETHING ELSE: #{c.inspect}" 

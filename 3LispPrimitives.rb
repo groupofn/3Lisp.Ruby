@@ -9,60 +9,34 @@ module ThreeLispPrimitives
     [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
       raise_error(self, "3-Lisp run-time error: " + args.first.to_s + "\n") }],
     
-    [:SYSTEM, :SIMPLE, Rail.new(:command), lambda{|args|
-      raise_error(self, "SYSTEM expects a command string") if !args.first.string?
-      if system(args.first)
-        return Handle.new(:OK) 
-      end
+    [:SYS, :SIMPLE, Rail.new(:command, :arguments), lambda{|args|
+      raise_error(self, "Usage: (system command-string) or (system command-string arg-string ...)") if args.length < 1
+      raise_error(self, "SYSTEM expects a command string but was given #{args.first.to_s}") if !args.first.string?
 
-      raise_error(self, "System command " + args.first + " failed with exit status " + $?.to_i.to_s)
-    }],
-    
-    [:EDRE, :SIMPLE, Rail.new(:"editor filename"), lambda{|args|
-      filename = "temp.3lisp"
-      editor = "vi"
-
-      if !args.empty?
-        if args.length == 1
-          raise_error(self, "SYSTEM expects a file name but was given #{args.first.to_s}") if !args.first.string?
-          filename = args.first        
-          editor = "vi"
-        elsif args.length == 2
-          raise_error(self, "SYSTEM expects an editor name but was given #{args.first.to_s}") if !args.first.string? 
-          raise_error(self, "SYSTEM expects a file name but was given #{args.first.to_s}") if !args.second.string? 
-          editor = args.first
-          filename = args.second        
-        else
-          raise_error(self, "Usage: (edex), (edex file), or (edex editor file)") 
-        end
-      end
+      sh_command = args.first 
+      args.rest.each { |a| 
+        raise_error(self, "SYSTEM expects a command string but was given #{a.to_s}") if !a.string?
+        sh_command += " " + a  
+      }
       
-      if system(editor + " " + filename)      
-=begin      
-        stdin_num = $stdin.fileno
-#        puts "stdin fileno is: #{stdin_num}"
-        save_stdin = $stdin.clone
-        begin
-          stin = IO.new(stdin_num,"w")
-          stin.puts `cat #{filename}`
-        rescue
-          puts "got #{$!}"
-        end
-        $stdin.reopen(save_stdin) 
-        return Handle.new(:OK) 
-=end
-        parsed = $parser.parse(IO.read(filename))
-        if parsed.empty?
-          return Handle.new(:ERROR) 
-        end
-        
-        return parsed.up
-      end
+      return Handle.new(:OK) if system(sh_command)
 
-      raise_error(self, "System command " + args.first + " failed with exit status " + $?.to_i.to_s)
+      raise_error(self, "System command " + sh_command + " exited with status " + $?.to_i.to_s)
     }],
     
+    [:SOURCE, :SIMPLE, Rail.new(:string), lambda{|args|
+      raise_error(self, "Usage: (source filename-string)") if args.length != 1    
+      raise_error(self, "SOURCE expects a string of file name but was given #{args}.first.to_s") if !args.first.string?
+      
+      return IO.read(args.first)
+    }],
     
+    [:PARSE, :SIMPLE, Rail.new(:string), lambda{|args|
+      parsed = $parser.parse(args.first)
+      raise_error(self, "Failed to internalise string: #{args.first}") if parsed.empty?
+      struc = parsed.up
+    }],
+        
     [:READ, :SIMPLE, :args, lambda{|args|
       raise_error(self, "READ expects a structure but was given #{args.first.to_s}") if !args.first.handle?
       code = nil

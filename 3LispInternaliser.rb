@@ -1,6 +1,7 @@
 # encoding: UTF-8
 
 require './3LispClasses.rb'
+require './3LispError.rb'
 
 ### Ruby constants for reserved characters ###
 
@@ -48,6 +49,8 @@ SIGNS = [PLUS, MINUS]
 DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 class ThreeLispInternaliser
+  include ThreeLispError
+  
   attr_accessor :source, :index, :line, :column
   
   def initialize
@@ -97,18 +100,18 @@ class ThreeLispInternaliser
       end
       self.index += 1
     end
-    raise("Line #{line} Column #{column}: " + STRING_END + " expected.") if index == source.length
+    raise_error(self, "Line #{line} Column #{column}: " + STRING_END + " expected.", ThreeLispSyntaxError) if index == source.length
     self.index += 1; self.column += 1 # absorb STRING_END
     source[start..index-2]
   end
 
   def internalise_pair(bqlevel)
     skip_separators
-    raise("Line #{line} Column #{column}: expression expected") if index == source.length
+    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if index == source.length
  
     car = internalise_exp(bqlevel)
     skip_separators
-    raise("Line #{line} Column #{column}: expression expected") if index == source.length
+    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if index == source.length
  
     if source[index] == PAIR_BREAK
       self.index += 1; self.column += 1
@@ -116,7 +119,7 @@ class ThreeLispInternaliser
       cdr = internalise_exp(bqlevel)
       skip_separators
       if index == source.length || source[index] != PAIR_END
-        raise("Line #{line} Column #{column}: " + PAIR_END + " expected.") 
+        raise_error(self, "Line #{line} Column #{column}: " + PAIR_END + " expected.", ThreeLispSyntaxError) 
       end
       self.index += 1; self.column += 1  # absorb PAIR_END
     elsif source[index] == PAIR_END
@@ -135,7 +138,7 @@ class ThreeLispInternaliser
       skip_separators
       if index == source.length
         if ending.length > 0        
-          raise("End of input reached while expecting '" + ending + "'.")
+          raise_error(self, "End of input reached while expecting '" + ending + "'.", ThreeLispSyntaxError)
         else
           return exps
         end
@@ -188,7 +191,7 @@ class ThreeLispInternaliser
       result = internalise_string
     when COMMA
       self.index += 1; self.column += 1
-      raise("Line #{line} Column #{column}: ',' has no matching '`'.") if bqlevel < 1
+      raise_error(self, "Line #{line} Column #{column}: ',' has no matching '`'.", ThreeLispSyntaxError) if bqlevel < 1
       result = CommaExpression.new(internalise_exp(bqlevel-1)) # no space between comma and what's comma-ed
     when BACKQUOTE
       self.index += 1; self.column += 1   # no space between backquote and what's quoted
@@ -207,7 +210,7 @@ class ThreeLispInternaliser
         self.index += 1; self.column += 1 
       end
       
-      raise("Line #{line} Column #{column}: expression expected.") if index == start
+      raise_error(self, "Line #{line} Column #{column}: expression expected.", ThreeLispSyntaxError) if index == start
 
       if is_numeral && !SIGNS.include?(source[start..index-1])
         result = source[start..index-1].to_i

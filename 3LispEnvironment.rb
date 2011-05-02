@@ -130,6 +130,13 @@ protected
         end
       end
 
+      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
+      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
+
+      al = args.length; pl = pattern.length
+      raise_error(self, "too many arguments") if al > pl
+      raise_error(self, "too few arguments") if al < pl
+
       while !args.empty?
         bind_pattern_helper(newbindings, pattern.element, args.element)
         args = args.remaining; pattern = pattern.remaining

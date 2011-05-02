@@ -300,6 +300,12 @@ def threeLisp
   rescue RuntimeError, ZeroDivisionError => detail
     print "3-Lisp run-time error: " + detail.message + "\n" 
     retry
+  rescue Errno::ENOENT, Errno::EACCES => detail
+    print "3-Lisp IO error: " + detail.message + "\n"
+    retry 
+  rescue ThreeLispSyntaxError => detail
+    print "3-Lisp syntax error: " + detail.message + "\n" 
+    retry
   end
 end
   
