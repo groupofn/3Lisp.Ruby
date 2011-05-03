@@ -624,6 +624,17 @@
   (lambda reflect [args env cont]
     (cont (normalise-rail (parse (source . ↓args)) env id))))
 
+
+(define pp ; pretty print draft ...
+  (lambda simple [exp]
+    (select (type exp)
+      [['atom 'numeral 'boolean 'rail] (print exp)]
+      ['environment DO_STH]
+      ['closure DO_STH]
+      ['pair DEal_with_cond/let/select/define/lambda/if/block/do]
+      [$T (print exp)])))
+    
+
 ;;
 ;; 
 ;;

@@ -89,7 +89,7 @@ def threeLisp
           elapsed = Time.now - oldtime
   
           # uncomment the following line to get time for each interaction
-           p elapsed
+          # p elapsed
                   
     	    ipp_args = [prompt_and_read(level)] # initialize here!
         end

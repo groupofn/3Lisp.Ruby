@@ -1,37 +1,43 @@
 # encoding: UTF-8
 
-
 # TO DO: 
 # [x] do not perform highlighting when caret is after a ';', i.e., in comment
 # [x] ignore parens/brackets in comments during highlighting
 # [x] do not perform matching when caret is after a ';' on the same line
 # [x] ignore parens/brackets in comments during matching
-# [ ] history
-# [ ] page-up; page-down; home; end
 
-# [ ] Fix up the "- >" hack
-# [ ] Deal with deletion of invisible characters
-# [ ] Change direct reference to instance variables to accessors
+# [x] history
+# [x] page-up; page-down; home; end
+
+# [ ] Fix up the "- >" hack; needs to be coordinated with a re-design of prompt-and-read ...
+# [ ] Deal with deletion of invisible characters <= Is this a problem? Which characters?
+# [ ] Change direct reference to instance variables to accessors. Probably unnecessary ...
 
 class ExpReader
 
   def initialize
-    @history = 
-  
+    @history = [] # an Array of lines, each of which corresponds to an activated command
+
+    reinitialize  
+  end
+
+  def reinitialize
     @lines = [""] # an Array of strings, each of which corresponds to a line; initialized to one empty line
     @row_pos = 0  # row position of the caret in the current text-editing area of the terminal 
     @col_pos = 0  # column position of the caret, starting from 0, which means inserting to the leftmost column 
 
-    @comment_starts = [1] # col_pos of semicolon on a line; for a line without a semicolon, it's set to length_of_line;
-    
+    @comment_starts = [1] # col_pos of semicolon on a line; for a line without a semicolon, it's set to length_of_line;    
     @indent_unit = "  " # 2 space characters
+    
+    @ix_lines_being_edited = @history.length # what's being edited is the next command in history ;-)
+    @temp_lines = nil # used to save the newly inputted lines when browsing history
   end
-
+  
   def read_char 
     c = STDIN.getc.chr 
     # gather next two characters of special or "escape" keys 
     if (c=="\e") 
-      extra_thread = Thread.new{ 
+      extra_thread = Thread.new { 
         c = c + STDIN.getc.chr 
         c = c + STDIN.getc.chr 
         c = c + STDIN.getc.chr 
@@ -153,18 +159,41 @@ class ExpReader
           " " + "\b" * (@lines[@row_pos].length - pos + 1)
   end
 
+# needs to be fixed up!
   def merge_lines  
     print "\e7" # save cursor position
     print "\e[J" # clear the "residue" lines
-    print @lines[@row_pos+1] + "\r\n"
+    print @lines[@row_pos+1]
     @lines[@row_pos] << @lines[@row_pos + 1]
     update_comment_start_of_line(@row_pos)
     @lines.delete_at(@row_pos+1)
     @comment_starts.delete_at(@row_pos+1)
-    @lines[@row_pos+1..-1].each{|line|
-      print line + "\r\n"
+    @lines[@row_pos+1..-1].each { |line|
+      print "\r\n- > " + line
     }
     print "\e8" # restore cursor position
+  end
+  
+  def clear_current
+    if @row_pos > 0 # 0 must be avoided because "\e[0A" does move the cursor one line up!
+      print "\e[#{@row_pos}A" # move cursor up @row_pos-1 many lines; 
+    end
+    print "\b" * @col_pos # move cursor left @col_pos many characters
+    print "\e[J" # clear below cursor
+  end
+  
+  def display_lines
+    @comment_starts = Array.new(@lines.length)
+    if @lines.length > 1
+      for i in 0..@lines.length-2
+        print @lines[i] + "\r\n- > "   # because of leading "- >"
+        update_comment_start_of_line(i)
+      end
+    end
+    print @lines[-1]
+    update_comment_start_of_line(-1)
+    @row_pos = @lines.length - 1
+    @col_pos = @lines[-1].length
   end
 
   def read
@@ -179,7 +208,7 @@ class ExpReader
       STDOUT.sync = true
 
       exp_incomplete = true
-      initialize
+      reinitialize
 
       while exp_incomplete do
         char = read_char # note that char is a Fixnum
@@ -189,8 +218,8 @@ class ExpReader
           print "\r\n... abandoning edits ...\r\n"
           return ""
         when "\n", "\r"
-          if @row_pos == @lines.length - 1 && @col_pos == @lines[@lines.length-1].length && parens_match?
-            insert_char(char)
+#          p @col_pos; p parens_match?
+          if @row_pos == @lines.length - 1 && @col_pos == @lines[-1].length && parens_match?
             exp_incomplete = false
             print "\r\n"
           else
@@ -204,21 +233,62 @@ class ExpReader
             print newline_slice
             @lines.insert(@row_pos, leading_space + newline_slice)
             update_comment_start_of_line(@row_pos)
-            for i in @row_pos+1..-1
-              print "\r\n" + @lines[i]
+            for i in @row_pos+1..@lines.length-1
+              print "\r\n- > " + @lines[i]
               update_comment_start_of_line(i)
             end
             print "\e8" # restore cursor position
-            print "\e[A" if @row_pos < @lines.length - 1 # correct for scrolling
+#            print "\e[A" if @row_pos < @lines.length - 1 # correct for scrolling
           end
-        when "\e[H"
-          puts "home!"
-        when "\e[F"
-          puts "end!"
-        when "\e[6~"
-          puts "page down!"
-        when "\e[5~"
-          puts "page up!"
+        when "\e[H" # "shift-Home": move to either first non-space character on the line or beginning of line
+          if (@col_pos > 0)
+            preceding = @lines[@row_pos][0..@col_pos-1] # characters before @col_pos
+            match_data = preceding.match(/^[ \t]+/) # match for leading space
+            if match_data.nil? || match_data[0].length == @col_pos # no preceding space or already at leading space
+              print "\b" * @col_pos # move to leftmost
+              @col_pos = 0              
+            else
+              distance_to_first_none_space = @col_pos - match_data[0].length
+              print "\b" * distance_to_first_none_space
+              @col_pos = @col_pos - distance_to_first_none_space
+            end
+          else
+            print "\a"
+          end
+        when "\e[F" # "shift-End"
+          if @col_pos < @lines[@row_pos].length
+            print "\e[#{@lines[@row_pos].length - @col_pos}C"
+            @col_pos = @lines[@row_pos].length
+            sleep(0.2) # allow cursor to be displayed first
+            pair_highlight
+          else
+            print "\a"
+          end
+        when "\e[6~" # "shift-PageDn"
+          if @ix_lines_being_edited < @history.length
+            clear_current
+            @ix_lines_being_edited += 1
+            if @ix_lines_being_edited == @history.length
+              @lines = @buffer
+            else
+              @lines = @history[@ix_lines_being_edited]
+            end
+            display_lines
+          else
+            print "\a"
+          end
+        when "\e[5~" # "shift-PageUp"
+          if @ix_lines_being_edited > 0
+            clear_current
+            if @ix_lines_being_edited == @history.length
+              @buffer = @lines
+            end
+            @ix_lines_being_edited -= 1
+            @lines = @history[@ix_lines_being_edited].map {|l| l.clone} # this is a bit wasteful of memory, but ...
+            display_lines
+          else
+            print "\a"
+          end
         when "\e[A" # "UP ARROW"
           if @row_pos > 0
             @row_pos -= 1
@@ -249,7 +319,7 @@ class ExpReader
           elsif @row_pos < @lines.length - 1
             @row_pos += 1
             @col_pos = 0 
-            print "\r\n\e[3C" # because of the leading "-> "
+            print "\r\n\e[4C" # because of the leading "- > "
           else
             print "\a"
           end
@@ -291,13 +361,11 @@ class ExpReader
         when "\003" # CTRL+c quits the whole thing!
           print "\r\n"
           Process.exit
-        when /^.$/ # "SINGLE CHAR"
+        when /^.$/ # "SINGLE CHAR", i.e. other escape sequences are ignored
           char = @indent_unit if char == "\t"
           
           insert_char(char) if char.length > 0
           pair_highlight
-######## other escape sequences are ignored
-#        else puts "SOMETHING ELSE: #{c.inspect}" 
         end
       end  
     rescue => ex 
@@ -309,7 +377,10 @@ class ExpReader
       # restore previous state of stty system 
       system "stty #{old_state}" 
     end
-    @lines.join("\n") + "\n"
+    result = @lines.join("\n") + "\n"
+    @history << @lines.map {|l| l.clone} if result.strip != "" # i.e. conatining non-space characters
+    # could prevent returning of all-space result too ...
+    result
   end
 end
 

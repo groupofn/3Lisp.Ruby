@@ -1,6 +1,6 @@
 Thoughts on primitives related to editing, reading and parsing of files:
 
-[1] (system "..." "...") => returns STDOUT as a string.
+[1] (system "..." "..." ...) => returns STDOUT as a string.
 
 [1.1] SOURCE ... PRIMITIVE
 
