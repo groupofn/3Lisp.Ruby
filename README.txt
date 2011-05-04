@@ -1,3 +1,10 @@
+TO DO
+
+[ ] Study prompt-and-read ... make a better API
+[ ] Improve global variable reference 
+[ ] Review treatment of String and Editing ...
+[ ] Review crossreference of Ruby files
+
 Thoughts on primitives related to editing, reading and parsing of files:
 
 [1] (system "..." "..." ...) => returns STDOUT as a string.

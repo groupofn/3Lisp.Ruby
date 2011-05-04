@@ -34,7 +34,7 @@ def three_lisp
   level = initial_level_at_prompt
   initial_defs = $parser.parse(IO.read("init-manual.3lisp"))
   elapsed = Time.now - oldtime
-#  print "Time spent on parsing initial definitions: "; p elapsed
+  print "Time spent on parsing initial definitions: "; p elapsed
   oldtime = Time.now
   library_just_loaded = false
 

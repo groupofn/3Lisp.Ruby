@@ -37,8 +37,8 @@ DOWN = "↓" # unicode 0x2193
 TRUE_NAME = "$T"
 FALSE_NAME = "$F"
 
-SPECIAL = [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
-           STRING_START, STRING_END, NAME_START]
+SPECIAL = [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, NAME_START, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
+           STRING_START, STRING_END]
 
 # Numeral
 
@@ -190,13 +190,13 @@ class ThreeLispInternaliser
       init_char = @ch
       s = "" << @ch
       
-      is_numeral = true
+      digits_only = true
       while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])
         s << @ch = source.slice!(0); self.column += 1 
-        is_numeral = false if !DIGITS.include?(@ch)
+        digits_only = false if !DIGITS.include?(@ch)
       end
 
-      if is_numeral && !SIGNS.include?(init_char)
+      if digits_only && (DIGITS.include?(init_char) || (SIGNS.include?(init_char) && s.length > 1))
         result = s.to_i
       else 
         result = s.upcase.to_sym
@@ -222,7 +222,6 @@ class ThreeLispInternaliser
     self.line = 1
     self.column = 1
     self.source = source
-    @length = source.length
     
     internalise_rail(0)
   end
