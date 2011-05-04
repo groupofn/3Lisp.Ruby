@@ -26,17 +26,19 @@ end
 #####
 
 def three_lisp
+  oldtime = Time.now
+  
   # global to threeLisp: state, level, env, cont
   initial_level_at_prompt = 0                         # rather than 1 as in Implementation paper
   state = IPPState.new(initial_level_at_prompt)   # rather than initial_tower(2) as in Implementation paper
-  level = initial_level_at_prompt                    
+  level = initial_level_at_prompt
   initial_defs = $parser.parse(IO.read("init-manual.3lisp"))
- 
+  elapsed = Time.now - oldtime
+#  print "Time spent on parsing initial definitions: "; p elapsed
+  oldtime = Time.now
   library_just_loaded = false
 
   $stdout = File.open("/dev/null", "w")
-  
-  oldtime = Time.now
   
   begin	
   	ipp_proc = :"READ-NORMALISE-PRINT"
@@ -55,7 +57,7 @@ def three_lisp
       case ipp_proc
   
       when :"READ-NORMALISE-PRINT"		# state level env
-        if initial_defs.length > 0
+        if !initial_defs.empty?
           ipp_args = [initial_defs.pop.up]
           library_just_loaded = true if initial_defs.length == 0
         else
@@ -63,13 +65,15 @@ def three_lisp
             $stdout.close
             $stdout = STDOUT
             library_just_loaded = false
+            
+            elapsed = Time.now - oldtime
+#            print "Time spent on normalising initial definitions: "; p elapsed
+          else
+            elapsed = Time.now - oldtime
+          # uncomment the following line to get time for each interaction
+#            print "Time elapsed: "; p elapsed
           end
   
-          elapsed = Time.now - oldtime
-  
-          # uncomment the following line to get time for each interaction
-          # p elapsed
-                  
     	    ipp_args = [prompt_and_read(level)] # initialize here!
         end
         cont = make_reply_continuation(level, env)

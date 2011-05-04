@@ -11,7 +11,7 @@ SPACE = " "
 TAB = "\t"
 NEWLINE = "\n"
 CARRIAGE_RETURN = "\r"
-SPACES = [SPACE, TAB, NEWLINE, CARRIAGE_RETURN]
+SPACES = [SPACE, NEWLINE, CARRIAGE_RETURN, TAB]
 
 COMMENT_START = ";"
 SEPARATORS = SPACES + [COMMENT_START]
@@ -37,8 +37,8 @@ DOWN = "↓" # unicode 0x2193
 TRUE_NAME = "$T"
 FALSE_NAME = "$F"
 
-SPECIAL = [PAIR_START, PAIR_BREAK, PAIR_END, RAIL_START, RAIL_END, QUOTE, BACKQUOTE, COMMA, 
-           STRING_START, STRING_END, NAME_START, UP, DOWN]
+SPECIAL = [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
+           STRING_START, STRING_END, NAME_START]
 
 # Numeral
 
@@ -51,10 +51,10 @@ DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 class ThreeLispInternaliser
   include ThreeLispError
   
-  attr_accessor :source, :index, :line, :column
+  attr_accessor :source, :line, :column
   
   def initialize
-    self.source, self.index, self.line, self.column = nil, 0, 0, 0
+    self.source, self.line, self.column = nil, 0, 0, 0
   end
 
   class CommaExpression
@@ -66,85 +66,82 @@ class ThreeLispInternaliser
   end
 
   def skip_to_eol
-    while index < source.length && source[index] != NEWLINE
-      self.index += 1
+    while !source.empty? && source[0] != NEWLINE
+      source.slice!(0)
       self.column += 1
     end
   end
 
   def skip_separators
-    while index < source.length && SEPARATORS.include?(source[index])
-      if source[index] == NEWLINE
-        self.index += 1; 
+    while !source.empty? && SEPARATORS.include?(source[0])
+      @ch = source.slice!(0)
+      if @ch == NEWLINE
         self.line += 1; 
         self.column = 1
-      elsif source[index] == COMMENT_START
-        self.index += 1;
+      elsif @ch == COMMENT_START
         self.column += 1;
         skip_to_eol
       else
-        self.index += 1; 
         self.column += 1
       end
     end
   end
 
   def internalise_string
-    start = index
-    while index < source.length && source[index] != STRING_END
-      if source[index] == NEWLINE
+    s = ""
+    while !source.empty? && source[0] != STRING_END
+      s << @ch = source.slice!(0)
+      if @ch == NEWLINE # there is a potential problem here in "\n"
         self.line += 1; 
         self.column = 1
       else
         self.column += 1
       end
-      self.index += 1
     end
-    raise_error(self, "Line #{line} Column #{column}: " + STRING_END + " expected.", ThreeLispSyntaxError) if index == source.length
-    self.index += 1; self.column += 1 # absorb STRING_END
-    source[start..index-2]
+    raise_error(self, "Line #{line} Column #{column}: " + STRING_END + " expected.", ThreeLispSyntaxError) if source.empty?
+    source.slice!(0); self.column += 1 # absorb STRING_END
+    return s
   end
 
   def internalise_pair(bqlevel)
     skip_separators
-    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if index == source.length
+    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if source.empty?
  
     car = internalise_exp(bqlevel)
     skip_separators
-    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if index == source.length
+    raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if source.empty?
  
-    if source[index] == PAIR_BREAK
-      self.index += 1; self.column += 1
+    if source[0] == PAIR_BREAK
+      source.slice!(0)
+      self.column += 1
       skip_separators
       cdr = internalise_exp(bqlevel)
       skip_separators
-      if index == source.length || source[index] != PAIR_END
+      if source.empty? || source[0] != PAIR_END
         raise_error(self, "Line #{line} Column #{column}: " + PAIR_END + " expected.", ThreeLispSyntaxError) 
       end
-      self.index += 1; self.column += 1  # absorb PAIR_END
-    elsif source[index] == PAIR_END
+    elsif source[0] == PAIR_END
       cdr = Rail.new
-      self.index += 1; self.column += 1  # absorb PAIR_END
     else
       cdr = internalise_rail(bqlevel, PAIR_END)
-      self.index += 1; self.column += 1  # absorb PAIR_END
     end
+    source.slice!(0); self.column += 1  # absorb PAIR_END
     Pair.new(car, cdr)
   end
 
   def internalise_rail(bqlevel, ending="")
     exps = Rail.new
-    while index < source.length
+    while !source.empty?
       skip_separators
-      if index == source.length
+      if source.empty?
         if ending.length > 0        
           raise_error(self, "End of input reached while expecting '" + ending + "'.", ThreeLispSyntaxError)
         else
           return exps
         end
-      elsif ending.length > 0 && source[index] == ending
+      elsif ending.length > 0 && source[0] == ending
         if ending == RAIL_END
-          self.index += 1; self.column += 1
+          source.slice!(0); self.column += 1
         end
         break
       else
@@ -155,67 +152,54 @@ class ThreeLispInternaliser
   end
   
   def internalise_exp(bqlevel)
-    case source[index]
+    @ch = source.slice!(0); self.column += 1
+    case @ch
     when PAIR_START
-      self.index += 1; self.column += 1
       result = internalise_pair(bqlevel)
     when RAIL_START
-      self.index += 1; self.column += 1
       result = internalise_rail(bqlevel, RAIL_END)
     when QUOTE
-      self.index += 1; self.column += 1 
       result = Handle.new(internalise_exp(bqlevel))
     when UP
-      self.index += 1; self.column += 1 
       result = Pair.new(:UP, Rail.new(internalise_exp(bqlevel)))
     when DOWN
-      self.index += 1; self.column += 1 
       result = Pair.new(:DOWN, Rail.new(internalise_exp(bqlevel)))    
     when NAME_START
-      self.index += 1; self.column += 1 
-      start = index - 1
+      n = "" << @ch
       
-      while index < source.length && !SEPARATORS.include?(source[index]) && !SPECIAL.include?(source[index])        
-        self.index += 1; self.column += 1 
+      while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])        
+        n << source.slice!(0); self.column += 1 
       end
 
-      if source[start..index-1].upcase == TRUE_NAME
+      if n.upcase == TRUE_NAME
         result = true
-      elsif source[start..index-1].upcase == FALSE_NAME 
+      elsif n.upcase == FALSE_NAME 
         result = false 
       else
         # this will be where other names are handled
       end
     when STRING_START
-      self.index += 1; self.column += 1 
       result = internalise_string
     when COMMA
-      self.index += 1; self.column += 1
       raise_error(self, "Line #{line} Column #{column}: ',' has no matching '`'.", ThreeLispSyntaxError) if bqlevel < 1
       result = CommaExpression.new(internalise_exp(bqlevel-1)) # no space between comma and what's comma-ed
-    when BACKQUOTE
-      self.index += 1; self.column += 1   # no space between backquote and what's quoted
+    when BACKQUOTE # no space between backquote and what's quoted
       exp = internalise_exp(bqlevel+1)
       result = process_bq(exp)
-    else # atom or numeral 
-      start = index
+    else # atom or numeral
+      init_char = @ch
+      s = "" << @ch
       
-      if SIGNS.include?(source[index])
-        self.index += 1; self.column += 1 
+      is_numeral = true
+      while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])
+        s << @ch = source.slice!(0); self.column += 1 
+        is_numeral = false if !DIGITS.include?(@ch)
       end
-      
-      is_numeral = true;
-      while index < source.length && !SEPARATORS.include?(source[index]) && !SPECIAL.include?(source[index])        
-        is_numeral = false if !DIGITS.include?(source[index])
-        self.index += 1; self.column += 1 
-      end
-      
-      raise_error(self, "Line #{line} Column #{column}: expression expected.", ThreeLispSyntaxError) if index == start
 
-      if is_numeral && !SIGNS.include?(source[start..index-1])
-        result = source[start..index-1].to_i
+      if is_numeral && !SIGNS.include?(init_char)
+        result = s.to_i
       else 
-        result = source[start..index-1].upcase.to_sym
+        result = s.upcase.to_sym
       end
     end
     
@@ -235,10 +219,10 @@ class ThreeLispInternaliser
   end
 
   def parse(source)
-    self.index = 0
     self.line = 1
     self.column = 1
     self.source = source
+    @length = source.length
     
     internalise_rail(0)
   end

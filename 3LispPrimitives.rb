@@ -80,6 +80,7 @@ module ThreeLispPrimitives
       raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
       case s1_rt
       when :RAIL
+        raise_error(self, "PRIMITIVE-CLOSURES is kernel and cannot be changed") if args.first.quoted.equal?($primitive_closures)      
         args.first.rplact(0, args.second.tail(0))
       when :PAIR
         args.first.rplaca(args.second.car)
@@ -264,7 +265,7 @@ module ThreeLispPrimitives
       raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
       raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
       raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
-      if args.third.eq?($global_env) && $reserved_names.include?(args.first.down)  
+      if args.third.equal?($global_env) && $reserved_names.include?(args.first.down)  
         raise_error(self, "Kernel or primitive name '#{args.first.down}' cannot be rebound in the global environment")
       end
       args.third.rebind_one(args.first, args.second) }],
