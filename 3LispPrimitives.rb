@@ -1,5 +1,7 @@
 # encoding: UTF-8
 
+# [ ] There is a question about REBIND: maybe I should block rebinding of all kernel stuff, on top of blocking replacing ...?
+
 require './3LispClasses.rb'
 
 module ThreeLispPrimitives
@@ -262,6 +264,9 @@ module ThreeLispPrimitives
       raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
       raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
       raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
+      if args.third.eq?($global_env) && $reserved_names.include?(args.first.down)  
+        raise_error(self, "Kernel or primitive name '#{args.first.down}' cannot be rebound in the global environment")
+      end
       args.third.rebind_one(args.first, args.second) }],
     [:BOUND, :SIMPLE, Rail.new(:var, :env), lambda{|args|
       raise_error(self, "BOUND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?

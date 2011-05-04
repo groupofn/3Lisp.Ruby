@@ -78,9 +78,12 @@ module ThreeLispKernel
   ]
 
   def initialize_kernel_utilities(env, parser)
+    reserved_KU_names = []
     KERNEL_UTILITY_PARTS.each {|e|
       env.rebind_one(e[0].up, Closure.new(e[1], env, e[2], parser.parse(e[3]).first, :Kernel_Utility, e[0]).up)
+      reserved_KU_names << e[0]
     }
+    return reserved_KU_names
   end
 
   RPP_PROC_PARTS = 
@@ -178,11 +181,14 @@ module ThreeLispKernel
 
   
   def initialize_ppp_table(env, parser)
+    reserved_ppp_names = []
     RPP_PROC_PARTS.keys.each {|name|
       parts = RPP_PROC_PARTS[name]
       closure = Closure.new(parts[0], env, parts[1], parser.parse(parts[2]).first, :PPP, name)
       env.rebind_one(name.up, closure.up)
+      reserved_ppp_names << name
     }
+    reserved_ppp_names
   end 
       
   RAW_PPC_TEMPLATES =
@@ -362,9 +368,11 @@ module ThreeLispKernel
   end
 
   def initialize_kernel(env, parser)
-    initialize_kernel_utilities(env, parser)
-    initialize_ppp_table(env, parser)
+    reserved_names = initialize_kernel_utilities(env, parser)
+    reserved_names += initialize_ppp_table(env, parser)
     initialize_ppc_templates_and_table(env, parser)
+    
+    return reserved_names
   end
 end # module ThreeLispKernel
 

@@ -1,27 +1,6 @@
 # encoding: UTF-8
 
-require 'rubygems'
-require './3LispReader.rb'
-require './3LispClasses.rb'
-require './3LispInternaliser.rb'
-require './3LispPrimitives.rb'
-require './3LispIPPState.rb'
-require './3LispKernel.rb'
-
-include ThreeLispKernel
-include ThreeLispPrimitives
-
-$STRINGS_used_by_ACONS = {}
-
-$reader = ExpReader.new
-$parser = ThreeLispInternaliser.new
-
-GLOBAL_ENV = Environment.new(PRIMITIVE_BINDINGS, {}) # tail env is empty!
-GLOBAL_ENV.rebind_one(:"PRIMITIVE-CLOSURES".up, Rail.new(*PRIMITIVE_CLOSURES).up)
-initialize_kernel(GLOBAL_ENV, $parser)
-GLOBAL_ENV.rebind_one(:"GLOBAL".up, GLOBAL_ENV.up)
-
-#####
+module ThreeLispIPP
 
 def prompt_and_read(level)
   code = nil
@@ -46,7 +25,7 @@ end
 
 #####
 
-def threeLisp
+def three_lisp
   # global to threeLisp: state, level, env, cont
   initial_level_at_prompt = 0                         # rather than 1 as in Implementation paper
   state = IPPState.new(initial_level_at_prompt)   # rather than initial_tower(2) as in Implementation paper
@@ -62,7 +41,7 @@ def threeLisp
   begin	
   	ipp_proc = :"READ-NORMALISE-PRINT"
   	ipp_args = [] 	  # "arguments" passed among the && procs as an array; none to READ-NORMALISE-PRINT  	  	  
-    env = GLOBAL_ENV 
+    env = $global_env 
     cont = nil
   	
   	until false do
@@ -289,7 +268,7 @@ def threeLisp
           
         ipp_args = [f.body.up]      
         env = f.environment.bind_pattern(f.pattern.up, Rail.new(*a).up)
-        cont = state.shift_up {|new_level| make_reply_continuation(new_level, GLOBAL_ENV)} 
+        cont = state.shift_up {|new_level| make_reply_continuation(new_level, $global_env)} 
         ipp_proc = :"NORMALISE" 
   		
       else
@@ -308,6 +287,5 @@ def threeLisp
     retry
   end
 end
-  
-threeLisp
-  
+
+end # module ThreeLispIPP
