@@ -1,9 +1,69 @@
 TO DO
 
-[ ] Study prompt-and-read ... make a better API
 [ ] Improve global variable reference 
-[ ] Review treatment of String and Editing ...
 [ ] Review crossreference of Ruby files
+
+
+3Lisp.rb 
+  Files
+    Current "require"
+      <- 3LispReader.rb
+      <- 3LispClasses.rb
+      <- 3LispInternaliser.rb
+      <- 3LispPrimitives.rb
+      <- 3LispIPPState.rb
+      <- 3LispKernel.rb
+      <- 3LispIPP.rb
+    Directly uses
+      <- 3LispReader.rb
+      <- 3LispInternaliser.rb
+      <- 3LispPrimitives.rb
+      <- 3LispKernel.rb
+      <- 3LispIPP.rb
+  Constants
+    Current
+      PRIMITIVE_BINDINGS from 3LispPrimitives.rb
+      PRIMITIVES         from 3LispPrimitives.rb
+      PRIMITIVE_CLOSURES from 3LispPrimitives.rb
+  Globals
+      $STRINGS_used_by_ACONS
+      $reader
+      $parser
+      $global_env
+      $reserved_names
+      
+      
+3LispIPP.rb 
+  Files
+    Current "require"
+      NONE!
+    Current use
+      IPPState <- 3LispIPPState.rb
+      ThreeLispError <- 3LispError.rb
+      <- 3LispClasses.rb
+      <- 3LispKernel.rb
+      <- 3LispError.rb
+  Constants
+    Current
+      NONE!
+    Future
+      PPP & PPC names
+  Globals
+      $global_env
+      $parser
+
+
+3LispPrimitives.rb
+
+
+3LispKernel.rb
+
+
+
+[ ] Study prompt-and-read ... make a better API
+
+[ ] Review treatment of String and Editing ...
+[ ] Align RPP with implementation ;-)
 
 Thoughts on primitives related to editing, reading and parsing of files:
 

@@ -38,7 +38,7 @@ public
 
   def self.rcons(args)
     args.map{|element| 
-      raise "RCONS expects structure but was given #{element.to_s}" if !element.handle?     
+      raise_error(self, "RCONS expects structure but was given #{element.to_s}") if !element.handle?     
       element.down
     }.up
   end

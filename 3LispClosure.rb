@@ -42,4 +42,8 @@ class Closure
   def de_reflect
     Closure.new(:SIMPLE, environment, pattern, body, system_type, name)
   end
+
+  def extract(variable)
+    environment.binding(variable).down
+  end
 end

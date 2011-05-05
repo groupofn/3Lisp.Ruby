@@ -336,10 +336,6 @@ module ThreeLispKernel
     make_rpp_continuation(:"COND-CONTINUATION", local_args)
   end
   
-  def ex(variable, closure)
-    closure.environment.binding(variable).down
-  end
-  
   def ppp_type(closure)
     return closure.name if closure.system_type == :PPP
     return :UNKNOWN
