@@ -579,7 +579,7 @@ y                   ; => 4
     (do [[v vec (rest v)] [r ((vector-constructor vec)) (prep (1st v) r)]]
       [[(empty v) r]])))
       
-(new-reverse [1 2 3])         ; => [3 2 1]
+(new-reverse [1 2 3 4 5])         ; => [5 4 3 2 1]
 (new-reverse '[1 '[2] [3]])   ; => '[[3] '[2] 1]
 
 ;;; True Value Operations
@@ -1066,8 +1066,8 @@ if
 
 ((lambda reflect [args env cont]
    (block (rebind 'b '10 env)
-          (cont 'done))))
-; b is now bound to 10
+          (cont 'done))))  ; b is now bound to 10
+b  ; => 10
 
 (define DEFINE-2
     (lambda reflect [[var def] env cont]

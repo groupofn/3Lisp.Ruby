@@ -1,7 +1,6 @@
 # encoding: UTF-8
 
 # [ ] Align prompt_and_read & prompt_and_reply with RPP version & primitives
-# [ ] Abstract out a timer utility?
 
 require './3LispError.rb'
 require './3LispReader.rb'
@@ -9,25 +8,37 @@ require './3LispClasses.rb'
 require './3LispInternaliser.rb'
 require './3LispKernel.rb'
 require './3LispPrimitives.rb'
+require './stopwatch.rb'
       
 class ThreeLispIPP
   include ThreeLispKernel
 
-  attr_accessor :reader, :parser, :global_env, :primitives, :state, :highest_level_reached
+  attr_accessor :reader, :parser, :global_env, :primitives, :reserved_names, :state, :highest_level_reached, :stopwatch
 
   def initialize(initial_level)
+    self.stopwatch = Stopwatch.new
+    stopwatch.mute # uncomment this line to turn off time reporting
+    stopwatch.start
+    
     self.highest_level_reached = initial_level
 
+    # these 4 must be created before initialization of primitives
+    # because they are used there by the primitives
     self.reader = ExpReader.new
-    self.parser = ThreeLispInternaliser.new
+    self.parser = ThreeLispInternaliser.new    
     self.global_env = Environment.new({}, {})
+    self.reserved_names = []
     
+    self.primitives = ThreeLispPrimitives.new(reader, parser, global_env, reserved_names)
+    
+    primitive_bindings, primitive_names = primitives.initialize_primitives
+    kernel_bindings, kernel_names = initialize_kernel(global_env, parser)
 
-    self.primitives = ThreeLispPrimitives.new(reader, parser, global_env) # this side-effects $global_env
-    primitives.reserved_names += initialize_kernel(global_env, parser)
+    global_env.local = primitive_bindings.merge!(kernel_bindings)
+    self.reserved_names += primitive_names + kernel_names 
 
     global_env.rebind_one(:"GLOBAL".up, global_env.up)
-    primitives.reserved_names << :"GLOBAL"
+    self.reserved_names << :"GLOBAL"
 
     self.state = [] 
   end
@@ -67,17 +78,15 @@ class ThreeLispIPP
   end
   
   def run
-    oldtime = Time.now
-    
-    # global to threeLisp: state, level, env, cont
     level = highest_level_reached
+
+    stopwatch.lap("Time spent on IPP initialization: ")
+
     initial_defs = parser.parse(IO.read("init-manual.3lisp"))
+
+    stopwatch.lap("Time spent on parsing initial defenitions: ")
     
-    elapsed = Time.now - oldtime
-    print "Time spent on parsing initial definitions: "; p elapsed
-    oldtime = Time.now
     library_just_loaded = false
-  
     $stdout = File.open("/dev/null", "w") # turn off STDOUT during normalization of initial definitions
     
     begin	
@@ -88,11 +97,14 @@ class ThreeLispIPP
     	
     	until false do
     
+      ###### uncomment some or all of the following 5 lines to trace the IPP ##############
+      #
       # print "level: "; p level
       # if ipp_proc == :"NORMALISE"
-  #        print "ipp_proc: "; p ipp_proc; print "ipp_args: ["; 
-  #        ipp_args.each {|e| print "\n            "; print e; }; print "\n          ]\n\n" 
-      #end	  
+      #   print "ipp_proc: "; p ipp_proc; print "ipp_args: ["; 
+      #   ipp_args.each {|e| print "\n            "; print e; }; print "\n          ]\n\n" 
+      # end
+      #
     
         case ipp_proc
     
@@ -106,19 +118,17 @@ class ThreeLispIPP
               $stdout = STDOUT
               library_just_loaded = false
               
-              elapsed = Time.now - oldtime
-  #            print "Time spent on normalising initial definitions: "; p elapsed
+              stopwatch.lap("Time spent on normalising initial defenitions: ")
             else
-              elapsed = Time.now - oldtime
-            # uncomment the following line to get time for each interaction
-              print "Time elapsed: "; p elapsed
+              stopwatch.lap("Time used: ")
             end
     
       	    ipp_args = [prompt_and_read(level)] # initialize here!
           end
           cont = make_reply_continuation(level, env)
           ipp_proc = :"NORMALISE"
-          oldtime = Time.now
+          
+          stopwatch.start
     		
     	  when :"REPLY-CONTINUATION"			# state result level env
           result = ipp_args[0]
@@ -168,8 +178,8 @@ class ThreeLispIPP
           proc_bang = f.extract(:"PROC!".up); # proc = f.extract(:PROC.up); args = f.extract(:ARGS.up)
           env = f.extract(:ENV.up)
           cont = f.extract(:CONT.up)
-          if primitives.primitive?(proc_bang.down)
-             ipp_args = [cont, primitives.ruby_lambda_for_primitive(proc_bang.down).call(args_bang.down).up]
+          if proc_bang.down.primitive?
+             ipp_args = [cont, proc_bang.down.ruby_lambda.call(args_bang.down).up]
              ipp_proc = :"CALL"
     		  else
             ipp_args = [proc_bang, args_bang]
@@ -178,7 +188,7 @@ class ThreeLispIPP
     
         when :"EXPAND-CLOSURE"				# state proc! args! cont
           proc_bang = ipp_args[0]; args_bang = ipp_args[1]
-          if ppp_type(proc_bang.down) == :"NORMALISE" # && plausible_arguments_to_normalise?(args_bang)
+          if proc_bang.down.ppp_type == :"NORMALISE" # && plausible_arguments_to_normalise?(args_bang)
             shift_down(cont)
             ipp_args = [args_bang.first.down]
             env = args_bang.second.down
@@ -187,7 +197,7 @@ class ThreeLispIPP
             next
           end
     		
-          ipp_proc = ppc_type(proc_bang.down)
+          ipp_proc = proc_bang.down.ppc_type
           if ipp_proc != :"UNKNOWN" # && plausible_arguments_to_a_continuation?(args_bang)
             shift_down(cont)
             ipp_args = [args_bang.first.down, proc_bang.down]
@@ -298,13 +308,13 @@ class ThreeLispIPP
           f = ipp_args[0]
           a = ipp_args[1..-1]
           
-          ipp_proc = ppc_type(f)  
+          ipp_proc = f.ppc_type  
           if ipp_proc != :"UNKNOWN"
             ipp_args = [a.first, f]
             next
           end
     		
-          ipp_proc = ppp_type(f)
+          ipp_proc = f.ppp_type
           if ipp_proc != :"UNKNOWN"
             ipp_args = a
             next

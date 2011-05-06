@@ -5,47 +5,32 @@
 require './3LispClasses.rb'
 
 class ThreeLispPrimitives
-  attr_accessor :reader, :parser, :global_env, :strings_used_by_acons, :primitive_ruby_lambdas, :primitive_functions, :reserved_names
 
-  def ruby_lambda_for_primitive(closure)
-    primitive_ruby_lambdas[closure.body]
+  def initialize(reader, parser, global_env, reserved_names)
+    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = reader, parser, global_env, reserved_names
+    @ACONS_STRINGS = {}
   end
 
-  def primitive?(f)
-    primitive_functions.include?(f)
-  end  
-
-  def initialize(reader, parser, global_env)
-    self.reader, self.parser, self.global_env = reader, parser, global_env
-    
-    self.strings_used_by_acons = {}
-    primitives = init_primitives
-    self.primitive_ruby_lambdas = Hash[primitives.map {|p| [p[0], p[3]] }]
-    
+  def initialize_primitives
     primitive_bindings = {}
     primitive_closures = Rail.new
-    self.primitive_functions = []
-    self.reserved_names = []
-    primitives.each { |p|
+    primitive_names = []
+    primitive_parts.each { |p|
       # circular closures: quoted atoms used as the body
       # defining env is empty
-      c = Closure.new(p[1], nil, p[2], p[0], :Primitive, p[0])  
-      
-      reserved_names.push(p[0]) 
-      primitive_functions.push(c)
+      # ruby lambda given as primitive_body
+      c_up = Closure.new(p[1], nil, p[2], p[0], :Primitive, p[0], p[3]).up      
+      primitive_names.push(p[0]) 
       
       # these last two must share the same c_up
-      c_up = c.up
       primitive_closures.push(c_up)
       primitive_bindings[p[0].up] = c_up 
     }
 
-    global_env.local = primitive_bindings
-    global_env.rebind_one(:"PRIMITIVE-CLOSURES".up, primitive_closures.up)
-    reserved_names << :"PRIMITIVE-CLOSURES"
+    return primitive_bindings, primitive_names
   end
 
-  def init_primitives
+  def primitive_parts 
     [
       [:EXIT, :SIMPLE, Rail.new, lambda {|args| Process.exit }],
       [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
@@ -84,7 +69,7 @@ class ThreeLispPrimitives
         code = nil
         while code.nil?
           print args.first.down.to_s + " " if !args.empty?   # args.first.handle?
-          parsed = parser.parse(reader.read)
+          parsed = @PARSER.parse(@READER.read)
           next if parsed.empty?
           code = parsed.first
         end
@@ -94,7 +79,7 @@ class ThreeLispPrimitives
           print args.first
         else
           raise_error(self, "PRINT expects a structure but was given #{args.first.to_s}") if !args.first.handle?    
-          print args.first.down.to_s + " "
+          print args.first.down.to_s
         end
         Handle.new(:OK)}],
       [:TERPRI, :SIMPLE, Rail.new, lambda{|args| print "\n"; Handle.new(:OK) }],
@@ -150,9 +135,9 @@ class ThreeLispPrimitives
       [:ACONS, :SIMPLE, :args, lambda{|args|
         begin
           s = "3LispAtom" << Time.now.to_f.to_s << rand(0x3fffffff).to_s 
-        end while !strings_used_by_acons[s].nil?
+        end while !@ACONS_STRINGS[s].nil?
       
-        strings_used_by_acons[s] = s.to_sym.up # returned
+        @ACONS_STRINGS[s] = s.to_sym.up # returned
       }],
   
       [:SCONS, :SIMPLE, :args, lambda{|args| 
@@ -286,6 +271,9 @@ class ThreeLispPrimitives
       [:"PROCEDURE-TYPE", :SIMPLE, Rail.new(:closure), lambda{|args| 
         raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
         args.first.down.kind.up }],
+      [:PRIMITIVE, :SIMPLE, Rail.new(:closure), lambda{|args|
+        raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
+        args.first.down.primitive? }],
     
       [:ECONS, :SIMPLE, Rail.new(:env), lambda{|args| 
         return Environment.new({}, {}) if args.empty? 
@@ -305,7 +293,7 @@ class ThreeLispPrimitives
         raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
         raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
         raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
-        if args.third.equal?(self.global_env) && self.reserved_names.include?(args.first.down)  
+        if args.third.equal?(@GLOBAL_ENV) && @RESERVED_NAMES.include?(args.first.down)  
           raise_error(self, "Kernel or primitive name '#{args.first.down}' cannot be rebound in the global environment")
         end
         args.third.rebind_one(args.first, args.second) }],
@@ -318,5 +306,5 @@ class ThreeLispPrimitives
         args.first.bound_atoms }], # returns a sequence of atom designators
     ]
   end
-  
+
 end

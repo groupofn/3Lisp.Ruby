@@ -303,11 +303,11 @@
 
 ;(define UNIT (lambda simple [vec] (= 1 (length vec))))       ; KU & different from manual
 
-;(define MEMBER                                               ; KU
-;  (lambda simple [element vector]
-;    (cond [(empty vector) $F]
-;          [(= element (1st vector)) $T]
-;          [$T (member element (rest vector))])))
+(define MEMBER                                               
+  (lambda simple [element vector]
+    (cond [(empty vector) $F]
+          [(= element (1st vector)) $T]
+          [$T (member element (rest vector))])))
 
 ; isomorphic is primitive for now ...
 
