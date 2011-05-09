@@ -57,17 +57,13 @@ module ThreeLispKernel
 
     [:"PAIR", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'pair)"],
 
-    [:"PROMPT&READ", :SIMPLE, Rail.new(:LEVEL), "
-      (block
-        (print ↑level)
-        (read '>))
+    [:"PROMPT&READ", :SIMPLE, Rail.new(:PROMPT), "
+        (read $T prompt)
     "],
   
-    [:"PROMPT&REPLY", :SIMPLE, Rail.new(:"RESULT!", :LEVEL), "
+    [:"PROMPT&REPLY", :SIMPLE, Rail.new(:"RESULT!", :PROMPT), "
       (block
-        (print ↑level)
-        (print '=)
-        (print result!)
+        (print result! $T prompt)
         (terpri))  
     "],
 
@@ -100,12 +96,13 @@ module ThreeLispKernel
   RPP_PROC_PARTS = 
   {
     :"READ-NORMALISE-PRINT" => [
-      :SIMPLE, Rail.new(:LEVEL, :ENV),
+      :SIMPLE, Rail.new(:"READ-PROMPT", :"REPLY-PROMPT", :ENV),
       "
-        (normalise (prompt&read level) env
+        (normalise (prompt&read read-prompt) env
           (lambda simple [result]                   ; REPLY continuation
-            (block (prompt&reply result level)
-              (read-normalise-print level env))))
+            (block 
+              (prompt&reply result reply-prompt)
+              (read-normalise-print read-prompt reply-prompt env))))
       "
     ],
   
@@ -207,8 +204,8 @@ module ThreeLispKernel
                 cont_name)
   end  
 
-  def make_reply_continuation(level, env)
-    local_args = Rail.new(level, env)
+  def make_reply_continuation(read_prompt, reply_prompt, env)
+    local_args = Rail.new(read_prompt, reply_prompt, env)
     make_rpp_continuation(:"REPLY-CONTINUATION", local_args)
   end
     
@@ -252,11 +249,12 @@ module ThreeLispKernel
   RAW_PPC_TEMPLATES =
   {
     :"REPLY-CONTINUATION"=> [
-      Rail.new(:LEVEL, :ENV), 
+      Rail.new(:"READ-PROMPT", :"REPLY-PROMPT", :ENV), 
       Rail.new(:"RESULT"),
       "
-        (block (prompt&reply result level)
-          (read-normalise-print level env))
+        (block 
+          (prompt&reply result read-prompt)
+          (read-normalise-print reply-prompt env))
       "
     ],
   
@@ -336,7 +334,7 @@ module ThreeLispKernel
       "
     ]
   }
-        
+
   def plausible_arguments_to_a_continuation?(args_bang)
     return args_bang.rail_d? && args_bang.length == 1 && args_bang.first.handle_d?
   end

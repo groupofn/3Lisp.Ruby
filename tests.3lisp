@@ -1044,6 +1044,8 @@ if
 (normalise '(normalise '(normalise '(normalise '1 global id) global id) global id) global id)
 (normalise '(normalise '(normalise '(normalise '(normalise '1 global id) global id) global id) global id) global id)
 
+(normalise '(normalise '(normalise '(normalise '(read-normalise-print " somewhere > " " somewhere = " global) global id) global id) global id) global id)
+
 ;;; basic reflection tests 
 
 ; test case from Implementation paper
@@ -1053,8 +1055,9 @@ if
 
 (define quit (lambda reflect [args env cont] 'done))
 (+ 2 (quit))
-(read-normalise-print 1 global)
-(read-normalise-print 2001 global)
+(read-normalise-print "" "" global)
+(read-normalise-print "Ha " "aH " global)
+(read-normalise-print "Blah " "halB " global)
 (quit)
 (quit)
 
@@ -1103,7 +1106,7 @@ b  ; => 10
   (lambda reflect [[arg] env cont]
     (block 
       (print arg) 
-      (read-normalise-print 'debug
+      (read-normalise-print "DEBUG > "
         (bind '[env cont return]
               ↑[env cont (lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
               env)))))

@@ -13,7 +13,7 @@
 
 ;; To be done: 
 
-; [ ] clean up READ, PRINT, PROMPT&READ, PROMPT&REPLY, READ-NORMALISE-PRINT: it seems that levels and prompts should be differentiated, maybe then combined?
+; [x] clean up READ, PRINT, PROMPT&READ, PROMPT&REPLY, READ-NORMALISE-PRINT: it seems that levels and prompts should be differentiated, maybe then combined?
 ; [x] ACONS
 ; [x] do
 ; [x] INTERNALISE and EXTERNALISE: provided primitively. note that the manual takes these to be non-primitive, which is OK 
@@ -57,6 +57,15 @@
           (rebind var def! global)
           (cont ↑var)))))
   global)
+
+(define MEMBER                                               
+  (lambda simple [element vector]
+    (cond [(empty vector) $F]
+          [(= element (1st vector)) $T]
+          [$T (member element (rest vector))])))
+
+
+
 
 (define version
   (lambda simple [] "3Lisp version R01, April 28, 2011"))

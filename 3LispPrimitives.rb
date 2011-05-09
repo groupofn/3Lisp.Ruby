@@ -6,8 +6,14 @@ require './3LispClasses.rb'
 
 class ThreeLispPrimitives
 
-  def initialize(reader, parser, global_env, reserved_names)
-    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = reader, parser, global_env, reserved_names
+#  def initialize(reader, parser, global_env, reserved_names)
+#    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = reader, parser, global_env, reserved_names
+#    @ACONS_STRINGS = {}
+#  end
+
+  def initialize(ipp)
+    @IPP = ipp
+#    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = ipp.reader, ipp.parser, ipp.global_env, ipp.reserved_names
     @ACONS_STRINGS = {}
   end
 
@@ -35,7 +41,8 @@ class ThreeLispPrimitives
       [:EXIT, :SIMPLE, Rail.new, lambda {|args| Process.exit }],
       [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
         raise_error(self, "3-Lisp run-time error: " + args.first.to_s + "\n") }],
-      
+      [:LEVEL, :SIMPLE, Rail.new, lambda {|args| @IPP.level }],
+                
       [:SYS, :SIMPLE, Rail.new(:command, :arguments), lambda{|args|
         raise_error(self, "Usage: (system command-string) or (system command-string arg-string ...)") if args.length < 1
         raise_error(self, "SYSTEM expects a command string but was given #{args.first.to_s}") if !args.first.string?
@@ -49,32 +56,68 @@ class ThreeLispPrimitives
         return Handle.new(:OK) if system(sh_command)
   
         raise_error(self, "System command " + sh_command + " exited with status " + $?.to_i.to_s)
-      }],
-      
+      }],      
       [:SOURCE, :SIMPLE, Rail.new(:string), lambda{|args|
         raise_error(self, "Usage: (source filename-string)") if args.length != 1    
         raise_error(self, "SOURCE expects a string of file name but was given #{args}.first.to_s") if !args.first.string?
         
         return IO.read(args.first)
-      }],
-      
+      }],      
       [:PARSE, :SIMPLE, Rail.new(:string), lambda{|args|
-        parsed = parser.parse(args.first)
+        parsed = @IPP.parser.parse(args.first)
         raise_error(self, "Failed to internalise string: #{args.first}") if parsed.empty?
         struc = parsed.up
       }],
           
       [:READ, :SIMPLE, :args, lambda{|args|
-        raise_error(self, "READ expects a structure but was given #{args.first.to_s}") if !args.first.handle?
-        code = nil
-        while code.nil?
-          print args.first.down.to_s + " " if !args.empty?   # args.first.handle?
-          parsed = @PARSER.parse(@READER.read)
-          next if parsed.empty?
-          code = parsed.first
+        case args.length
+        when 0 
+          show_level = false
+          prompt_string = ""
+        when 1
+          raise_error(self, "Usage: (READ), (READ show-level-or-not) or (READ show-level-or-not prompt-string)") if !args.first.boolean?
+          show_level = args.first
+          prompt_string = ""
+        when 2
+          raise_error(self, "Usage: (READ), (READ show-level-or-not) or (READ show-level-or-not prompt-string)") if !args.first.boolean?
+          raise_error(self, "Usage: (READ), (READ show-level-or-not) or (READ show-level-or-not prompt-string)") if !args.second.string?
+          show_level = args.first
+          prompt_string = args.second
+        else
+          raise_error(self, "Usage: (READ), (READ show-level-or-not) or (READ show-level-or-not prompt-string)")
         end
-        code.up }],
-      [:PRINT, :SIMPLE, Rail.new(:struc), lambda{|args|
+        
+        prompt_level = show_level ? @IPP.prompt_level : ""
+ 
+        begin
+          parsed = @IPP.parser.parse(@IPP.reader.read(prompt_level + prompt_string)) 
+          raise parser.failure_reason if parsed.nil?
+        end until !parsed.nil? && !parsed.empty?
+        return parsed.first.up if parsed.length == 1
+        parsed.up }],
+      [:PRINT, :SIMPLE, :args, lambda{|args|
+        case args.length
+        when 0 
+          raise_error(self, "Usage: (PRINT struc), (PRINT struc show-level-or-not) or (RPINT struc show-level-or-not prompt-string)")
+        when 1 
+          show_level = false
+          prompt_string = ""
+        when 2
+          raise_error(self, "Usage: (PRINT struc), (PRINT struc show-level-or-not) or (RPINT struc show-level-or-not prompt-string)") if !args.second.boolean?
+          show_level = args.second
+          prompt_string = ""
+        when 3
+          raise_error(self, "Usage: (PRINT struc), (PRINT struc show-level-or-not) or (RPINT struc show-level-or-not prompt-string)") if !args.second.boolean?
+          raise_error(self, "Usage: (PRINT struc), (PRINT struc show-level-or-not) or (RPINT struc show-level-or-not prompt-string)") if !args.third.string?
+          show_level = args.second
+          prompt_string = args.third
+        else
+          raise_error(self, "Usage: (PRINT struc), (PRINT struc show-level-or-not) or (RPINT struc show-level-or-not prompt-string)")
+        end
+                
+        prompt_level = show_level ? @IPP.prompt_level : ""
+        print prompt_level + prompt_string
+        
         if args.first.string?
           print args.first
         else
@@ -293,7 +336,7 @@ class ThreeLispPrimitives
         raise_error(self, "REBIND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
         raise_error(self, "REBIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
         raise_error(self, "REBIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
-        if args.third.equal?(@GLOBAL_ENV) && @RESERVED_NAMES.include?(args.first.down)  
+        if args.third.equal?(@IPP.global_env) && @IPP.reserved_names.include?(args.first.down)  
           raise_error(self, "Kernel or primitive name '#{args.first.down}' cannot be rebound in the global environment")
         end
         args.third.rebind_one(args.first, args.second) }],

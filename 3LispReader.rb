@@ -193,7 +193,26 @@ class ExpReader
     @col_pos = @lines[-1].length # caret is at the very end
   end
 
-  def read
+  def set_line_prefix(prompt)
+    @line_prefix = 
+      case prompt.length
+      when 0 
+        ""
+      when 1
+        " "
+      when 2
+        "> "
+      when 3
+        " > "
+      else
+        "-" * (prompt.length - 3) << " > "
+      end
+  end
+
+  def read(prompt = "")
+    set_line_prefix(prompt)
+    print prompt
+         
     begin
       # save previous state of stty 
       old_state = `stty -g` 
@@ -380,7 +399,6 @@ class ExpReader
         @history << @lines # because @lines were cloned from a past expression
       end
     end
-    # could prevent returning of all-space result too ...
     result
   end
 end
