@@ -10,12 +10,45 @@
 ;;;  messages from parsing and processing this file are suppressed.
 ;;;
 
-;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Some Essentials
-;;;
 
-;;; DEFEINE
+;; To be done: 
+
+; [x] clean up READ, PRINT, PROMPT&READ, PROMPT&REPLY, READ-NORMALISE-PRINT: it seems that levels and prompts should be differentiated, maybe then combined?
+; [x] ACONS
+; [x] do
+; [x] INTERNALISE and EXTERNALISE: provided primitively. note that the manual takes these to be non-primitive, which is OK 
+;                                  because the STRING type is not primitive, but rather sequence of characters. 
+; [-] I/O: NO support for streams for now. The Manual version has no CONS. It thus does not offer a useful, complete set.
+; [-] ?-ending of boolean functions ... not doing this so as to (i) conform to the manual & (ii) allow charactersitic functions for types
+; [x] REPLACE
+; => [x] REPLACE done for RAIL and PAIR
+; => [-] REPLACE not done for ATOM, because Ruby does not allow change of symbol, while retaining object identity. 
+; => [?] REPLACE could be trivially done for CLOSURE, but what's the point? 
+; [x] - + - * page 46 ...
+; [x] shared tail
+; [x] string
+
+;; To study:
+
+; [x] macro
+; - do
+; - slowness of let and possible fix
+; - select family
+; - let family
+; [x] catch/throw; delay/force
+; - Y-operator
+
+;; To think about
+; prompt&read ... do we need level number? I think NOT.
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Naming and Procedure Definition
+;;
+
+
+;;; DEFINE
 (rebind 'define
   ↑(lambda reflect [[var def] env cont]
     (normalise def env 
@@ -25,8 +58,139 @@
           (cont ↑var)))))
   global)
 
+(define MEMBER                                               
+  (lambda simple [element vector]
+    (cond [(empty vector) $F]
+          [(= element (1st vector)) $T]
+          [$T (member element (rest vector))])))
+
+
+
+
+(define version
+  (lambda simple [] "3Lisp version R01, April 28, 2011"))
+
+(define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
+;(define DOUBLE (lambda simple [vec] (and (not (empty vec)) (unit (rest vec))))) ; Manual version: slow on short vectors
+
+(define EXTERNAL    (lambda simple [x]
+                      (member (type x) 
+                              ['sequence 'number 'truth-value 'function
+                               'bindings])))
+
+(define VECTOR-CONSTRUCTOR
+  (lambda simple [template]
+    (if (external template) scons rcons)))
+
+;(define MAP
+;  (lambda simple args
+;    (if (empty (2nd args)) 
+;        ((vector-constructor (2nd args)))
+;        (if (double args)
+;            (prep ((1st args) (1st (2nd args)))
+;                  (map (1st args) (rest (2nd args))))
+;            (prep ((1st args) . (map 1st (rest args)))
+;                  (map . (prep (1st args) (map rest (rest args)))))))))
+
+(define MAP
+  (lambda simple args
+    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+          [(double args)
+           (prep ((1st args) (1st (2nd args)))
+                 (map (1st args) (rest (2nd args))))]
+          [$T (prep ((1st args) . (map 1st (rest args)))
+                    (map . (prep (1st args) (map rest (rest args)))))])))
+
+
+; LAMBDA
+
+; SIMPLE 
+
+; REFLECT
+
+
+(define MACRO
+  (lambda simple [def-env pattern body]
+    ((lambda simple [expander]
+       (lambda reflect [args env cont]
+         (normalise (expander . args) env cont)))
+     (simple def-env pattern body))))
+
+(define LET
+  (lambda macro [list body]
+    `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
+
+(define 1sts
+  (lambda simple [list]
+    (cond
+      [(empty list) ((vector-constructor list))]
+      [$T (prep (1st (1st list)) (1sts (rest list)))])))
+
+(define 2nds
+  (lambda simple [list]
+    (cond
+      [(empty list) ((vector-constructor list))]
+      [$T (prep (2nd (1st list)) (2nds (rest list)))])))
+
+(define LET                                                       ; performance of this version is 20% better than using MAP
+  (lambda macro [list body]
+    `((lambda simple ,(1sts list) ,body) . ,(2nds list))))
+
+;(define LET                                                      ; performance of this version is only slightly better.
+;  (lambda reflect [[list body] env cont]
+;    (normalise (2nds list) env 
+;      (lambda simple [args!]
+;        (normalise body (bind (1sts list) args! env) cont)))))
+
+(define LETSEQ
+  (lambda macro [list body]
+    (if (empty list)
+        body
+        `(let [,(1st list)]
+           (letseq ,(rest list) ,body)))))
+           
+(define LETREC
+  (lambda macro [list body]
+    `((lambda simple ,(map 1st list)
+        (block
+          (block . ,(map (lambda simple [x] `(set . ,x)) list))
+          ,body))
+      . ,(map (lambda simple [x] ''?) list))))
+
+(define REFLECT!
+  (lambda simple [def-env pattern body]
+    (let [[fun (simple def-env pattern body)]]
+      (lambda reflect [args env cont]
+        (normalise args env
+          (lambda simple [args!]
+            (fun args! env cont)))))))
+
+(define Y-OPERATOR
+  (lambda simple [fun]
+    (let [[temp (lambda simple ? ?)]]
+      (block (replace ↑temp ↑(fun temp)) temp))))
+      
+(define Y*-OPERATOR
+  (lambda simple funs
+    (let [[temps (map (lambda simple [fun] (lambda simple ? ?)) funs)]]
+      (map (lambda simple [temp fun]
+             (block (replace ↑temp ↑(fun . temps)) temp))
+           temps
+           funs))))
+
+(define REFLECTIFY
+  (lambda simple [fun]
+    (reflect (environment-designator ↑fun) (pattern ↑fun) (body ↑fun))))
+
+; DEFEIN
+
+(define DEFEIN
+  (lambda macro [label form]
+    `(block (set ,label (y-OPERATOR (lambda simple [,label] ,form)))
+            ,↑label)))
+
 ;;; SET -- assignment
-(define set
+(define SET
   (lambda reflect [[var exp] env cont]
     (normalise exp env
       (lambda simple [exp!]
@@ -34,58 +198,372 @@
           (rebind var exp! env)
           (cont ''ok))))))
 
-(define macro
-  (lambda simple [def-env pattern body]
-    ((lambda simple [expander]
-       (lambda reflect [args env cont]
-         (normalise (expander . args) env cont)))
-     (simple def-env pattern body))))
+(define SETREF
+  (lambda REFLECT! [[var! binding!] env cont]
+    (block (rebind ↓var! binding! env)
+           (cont ''OK))))
 
-(define let
-  (lambda macro [list body]
-    `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
+; REBIND is a primitive
 
-;;;
-;;; Essentials
-;;;
-;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Naming and Procedure Definition
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Frequently used stuff
-;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Control Structure Utilities
+;;
 
-(define id (lambda simple [x] x))
+; if
+
+; cond
+
+; cond-helper
+
+; block-helper
+
+; block
+
+(define DO
+  (lambda macro args
+    (let [[loop-name (acons)]                                 
+          [variables (map 1st (1st args))]
+          [init (map 2nd (1st args))]
+          [next (map 3rd (1st args))]
+          [quitters (2nd args)]
+          [body (if (double args) '$T (3rd args))]]
+      `(letrec [[,loop-name
+                 (lambda simple ,variables
+                   (cond
+                     . ,(append quitters
+                                `[[$T (block ,body
+                                             (,loop-name . ,next))]])))]]
+         (,loop-name . ,init)))))
+          
+
+(define SELECT
+  (lambda macro args
+    (letseq [[dummy (acons)]
+             [select-helper 
+                (lambda simple [[choice action]]
+                  (cond [(rail choice)
+                         `[(member ,dummy ,choice) ,action]]
+                        [(not (boolean choice))
+                         `[(= ,dummy ,choice) ,action ]]
+                        [$T `[,choice ,action]]))]]
+      `(let [[,dummy ,(1st args)]]
+          (cond . ,(map select-helper (rest args)))))))
+
+(define SELECTQ
+  (lambda macro args
+    (letseq [[dummy (acons)]
+             [selectq-helper
+               (lambda simple [[choice action]]
+                 (cond [(atom choice)
+                        `[(= ,dummy ,↑choice) ,action]]
+                       [(rail choice)
+                        `[(member ,dummy ,↑choice) ,action]]
+                       [$T `[,choice ,action]]))]]
+      `(let [[,dummy ,(1st args)]]
+          (cond . ,(map selectq-helper (rest args)))))))
+        
+(define CATCH
+  (lambda reflect [[exp] env cont]
+    (cont (normalise exp env id))))
+
+(define THROW
+  (lambda reflect! [[exp!] env cont] exp!))
+  
+
+(define DELAY                                                ; Is this the right name?
+  (lambda macro [exp]
+    `(lambda simple [] ,exp)))
+
+(define FORCE
+  (lambda simple [delayed-exp]
+    (delayed-exp)))
+
+;;
+;; Control Structure Utilities
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Vector Utilities
+;;
+
+
+;(define 1ST (lambda simple [vector] (nth 1 vector)))         ; KU
+;(define 2ND (lambda simple [vector] (nth 2 vector)))         ; KU
+(define 3RD (lambda simple [vector] (nth 3 vector)))
+(define 4TH (lambda simple [vector] (nth 4 vector)))
+(define 5TH (lambda simple [vector] (nth 5 vector)))
+(define 6TH (lambda simple [vector] (nth 6 vector)))
+
+(define LAST (lambda simple [vector] (nth (length vector) vector))) ; Not in manual
+
+;(define REST (lambda simple [vector] (tail 1 vector)))       ; KU
+
+(define foot (lambda simple [vector] (tail (length vector) vector)))
+
+;(define UNIT (lambda simple [vec] (= 1 (length vec))))       ; KU & different from manual
+
+(define MEMBER                                               
+  (lambda simple [element vector]
+    (cond [(empty vector) $F]
+          [(= element (1st vector)) $T]
+          [$T (member element (rest vector))])))
+
+; isomorphic is primitive for now ...
+
+(define isomorphic
+  (lambda simple [e1 e2]
+    (cond [(not (= (type e1) (type e2))) $F]
+          [(= e1 e2) $T]
+          [(rail e1)
+           (or (and (empty e1) (empty e2))
+               (and (not (empty e1))
+                    (not (empty e2))
+                    (isomorphic (1st e1) (1st e2))
+                    (isomorphic (rest e1) (rest e2))))]
+          [(pair e1)
+           (and (isomorphic (car e1) (car e2))
+                (isomorphic (cdr e1) (cdr e2)))]
+          [(closure e1)
+           (and (isomorphic (procedure-type e1)
+                            (procedure-type e2))
+                (isomorphic (pattern e1) (pattern e2))
+                (isomorphic (body e1) (body e2))
+                (isomorphic (environment-designator e1)
+                            (environment-designator e2)))]
+          [(handle e1) (isomorphic ↓e1 ↓e2)]
+          [(environment e1) 
+           (do [[e1-atoms (bound-atoms e1) (rest e1-atoms)] 
+                [e2-atoms (bound-atoms e2) (rest e2-atoms)]]
+               [[(empty e1-atoms) $T] 
+                [(not (isomorphic (1st e1-atoms) (1st e2-atoms))) $F]
+                [(not (isomorphic (binding (1st e1-atoms) e1) (binding (1st e2-atoms) e2))) $F]])]
+          [$T $F])))
+
+
+(define INDEX
+  (lambda simple [element vector]
+    (letrec [[index-helper 
+              (lambda simple [vector-tail position]
+                (cond [(empty vector-tail) 0]
+                      [(= (1st vector-tail) element) position]
+                      [$T (index-helper (rest vector-tail) (1+ position))]))]]
+      (index-helper vector 1))))
+      
+(define VECTOR-CONSTRUCTOR
+  (lambda simple [template]
+    (if (external template) scons rcons)))
+
+(define XCONS
+  (lambda simple args
+    (pcons (1st args) (rcons . (rest args)))))
+
+;(define MAP
+;  (lambda simple args
+;    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+;          [(double args)
+;           (prep ((1st args) (1st (2nd args)))
+;                 (map (1st args) (rest (2nd args))))]
+;          [$T (prep ((1st args) . (map 1st (rest args)))
+;                    (map . (prep (1st args) (map rest (rest args)))))])))
+
+(define COPY-VECTOR
+  (lambda simple [vector]
+    (if (empty vector)
+        ((vector-constructor vector))
+        (prep (1st vector) (copy-vector (rest vector))))))
+        
+(define CONCATENATE
+  (lambda simple [rail1 rail2]
+    (block
+      (replace (foot rail1) rail2) ; this follows page 40, rather than the code given
+      rail1)))   
+
+(define APPEND
+  (lambda simple [vector1 vector2]
+    (if (empty vector1)
+        vector2
+        (prep (1st vector1)
+              (append (rest vector1) vector2)))))
+              
+(define APPEND*
+  (lambda simple args
+    (if (unit args)
+        (1st args)
+        (append (1st args) (append* . (rest args))))))
+        
+(define REVERSE
+  (letrec [[rev (lambda simple [v1 v2]
+                  (if (empty v1)
+                      v2
+                      (rev (rest v1) (prep (1st v1) v2))))]]
+    (lambda simple [vector]
+      (rev vector ((vector-constructor vector))))))
+
+(define PUSH
+  (lambda simple [element stack]
+    (replace ↑stack
+             ↑(prep element
+                    (if (empty stack)
+                        (scons)
+                        (prep (1st stack) (rest stack)))))))
+                        
+(define POP
+  (lambda simple [stack]
+    (let [[top (1st stack)]]
+      (block
+        (replace ↑stack ↑(rest stack))
+        top))))
+
+;;
+;; Vector Utilities
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Arithmetic Utilities
+;;
 
 (define 1+ (lambda simple [n] (+ n 1)))
 (define 1- (lambda simple [n] (- n 1)))
 (define zero (lambda simple [n] (= n 0)))
 
-(define double (lambda simple [vec] (= 2 (length vec))))
-(define 3rd (lambda simple [vec] (nth 3 vec)))
-(define 4th (lambda simple [vec] (nth 4 vec)))
-(define last (lambda simple [vec] (nth (length vec) vec)))
-(define foot (lambda simple [vec] (tail (length vec) vec)))
+(define **                                ; m^n
+  (lambda simple [m n]
+    (do [[i 0 (1+ i)]
+         [a 1 (* a m)]]
+        [[(= i n) a]])))
+
+(define REMAINDER
+  (lambda simple [x y]
+    (- x (* (/ x y) y))))
+    
+(define ABS
+  (lambda simple [n]
+    (if (< n 0) (- 0 n) n)))              ; 
+
+(define MAX
+  (lambda simple numbers
+    (letrec [[max2
+                (lambda simple [x y] (if (> x y) x y))]
+             [max-helper
+                (lambda simple [unseen-numbers maximum]
+                  (if (empty unseen-numbers)
+                      maximum
+                      (max-helper (rest unseen-numbers)
+                                  (max2 (1st unseen-numbers) maximum))))]]
+      (max-helper (rest numbers) (1st numbers)))))
 
 
-(define number (lambda simple [x] (= (type x) 'number)))
-(define truth-value (lambda simple [x] (= (type x) 'truth-value)))
-(define sequence (lambda simple [x] (= (type x) 'sequence)))
-;(define atom (lambda simple [x] (= (type x) 'atom)))
-;(define rail (lambda simple [x] (= (type x) 'rail)))
-;(define pair (lambda simple [x] (= (type x) 'pair)))
-(define numeral (lambda simple [x] (= (type x) 'numeral)))
-(define boolean (lambda simple [x] (= (type x) 'boolean)))
-(define handle (lambda simple [x] (= (type x) 'handle)))
-(define closure (lambda simple [x] (= (type x) 'closure)))
-(define function (lambda simple [x] (= (type x) 'function)))
+(define MIN
+  (lambda simple numbers
+    (letrec [[min2
+                (lambda simple [x y] (if (< x y) x y))]
+             [min-helper
+                (lambda simple [unseen-numbers minimum]
+                  (if (empty unseen-numbers)
+                      minimum
+                      (min-helper (rest unseen-numbers)
+                                  (min2 (1st unseen-numbers) minimum))))]]
+      (min-helper (rest numbers) (1st numbers)))))
 
 
-(define not (lambda simple [b] (if b $F $T)))
+(define ODD (lambda simple [n] (not (zero (remainder n 2)))))
+(define EVEN (lambda simple [n] (zero (remainder n 2))))
 
-; from page 79 of Manual
-(define and 
+(define NEGATIVE     (lambda simple [n] (<  n 0)))
+(define NON-NEGATIVE (lambda simple [n] (>= n 0)))   ; >= provided primitively
+(define POSITIVE     (lambda simple [n] (>  n 0)))
+(define ZERO         (lambda simple [n] (= n 0)))
+
+
+;;
+;; Arithmetic Utilities
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; General Utilities
+;;
+
+;(define ATOM       (lambda simple [x] (= (type x) 'atom)))               ; KU
+;(define PAIR       (lambda simple [x] (= (type x) 'pair)))
+
+(define HANDLE      (lambda simple [x] (= (type x) 'handle)))
+;(define RAIL       (lambda simple [x] (= (type x) 'rail)))
+(define NUMERAL     (lambda simple [x] (= (type x) 'numeral)))
+(define BOOLEAN     (lambda simple [x] (= (type x) 'boolean)))
+(define CLOSURE     (lambda simple [x] (= (type x) 'closure)))
+(define ENVIRONMENT (lambda simple [x] (= (type x) 'environment)))        ; should use ? version to avoid conflict
+(define STREAMER    (lambda simple [x] (= (type x) 'streamer)))
+
+(define SEQUENCE    (lambda simple [x] (= (type x) 'sequence)))
+(define NUMBER      (lambda simple [x] (= (type x) 'number)))
+(define TRUTH-VALUE (lambda simple [x] (= (type x) 'truth-value)))
+(define FUNCTION    (lambda simple [x] (= (type x) 'function)))
+(define BINDINGS    (lambda simple [x] (= (type x) 'bindings)))
+(define STREAMER    (lambda simple [x] (= (type x) 'stream)))
+
+(define VECTOR      (lambda simple [x] (member (type x) ['rail 'sequence])))
+
+(define INTERNAL    (lambda simple [x] 
+                      (member (type x)
+                              ['atom 'pair 
+                               'handle 
+                               'rail 'numeral 'boolean 'closure
+                               'environment 'streamer])))
+
+(define EXTERNAL    (lambda simple [x]
+                      (member (type x) 
+                              ['sequence 'number 'truth-value 'function
+                               'bindings 'stream])))
+
+(define REFERENT
+  (lambda reflect! [[exp! env!] env cont]
+    (normalise ↓exp! ↓env! cont)))
+
+(define MACRO-EXPANDER
+  (lambda simple [macro-closure]
+    ↓(binding 'expander ↓(environment-designator ↑macro-closure))))
+
+(define ID (lambda simple [x] x))
+
+(define ID* (lambda simple x x))
+
+(define QUOTE (lambda reflect [[a] e c] (c ↑a)))
+
+(define RPLACT 
+  (lambda simple [n rail new-tail]
+    (replace (tail n rail) new-tail)))
+    
+(define RPLACN
+  (lambda simple [n rail new-element]
+    (replace (tail (- n 1) rail) (prep new-element (tail n rail)))))
+    
+(define RPLACA
+  (lambda simple [pair new-car]
+    (replace pair (pcons new-car (cdr pair)))))
+
+(define RPLACD
+  (lambda simple [pair new-cdr]
+    (replace pair (pcons (car pair) new-cdr))))
+
+(define NOT (lambda simple [b] (if b $F $T)))
+
+(define AND 
   (lambda reflect [args env cont]
     (if (rail args)
         (and-helper args env cont)
@@ -93,7 +571,7 @@
           (lambda simple [args!]
             (and-helper args! env cont))))))
 
-(define and-helper
+(define AND-HELPER
   (lambda simple [args env cont]
     (if (empty args)
         (cont '$T)
@@ -103,8 +581,7 @@
                 (and-helper (rest args) env cont)
                 (cont '$F)))))))
 
-; from page 79 of Manual
-(define or 
+(define OR 
   (lambda reflect [args env cont]
     (if (rail args)
         (or-helper args env cont)
@@ -112,7 +589,7 @@
           (lambda simple [args!]
             (or-helper args! env cont))))))
 
-(define or-helper
+(define OR-HELPER
   (lambda simple [args env cont]
     (if (empty args)
         (cont '$F)
@@ -122,27 +599,55 @@
                 (cont '$T)
                 (or-helper (rest args) env cont)))))))
 
-(define external
-  (lambda simple [x]
-    (member (type x) ['number 'sequence 'truth-value 'function])))
+;;
+;; General Utilities
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define vector-constructor
-  (lambda simple [template]
-    (if (external template) scons rcons)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Special Utilities  
+;;
 
-(define map
+;; create the load and edit stuff as in the manual 
+
+(define edit
   (lambda simple args
-    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
-          [(double args)
-           (prep ((1st args) (1st (2nd args)))
-                 (map (1st args) (rest (2nd args))))]
-          [$T (prep ((1st args) . (map 1st (rest args)))
-                    (map . (prep (1st args) (map rest (rest args)))))])))
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (sys editor file))))
 
-;;;
-;;; Frequently used stuff
-;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define editsource
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (block 
+        (sys editor file) 
+        (source file)))))
+  
+(define edex
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (editsource . ↓args)) env id))))
+
+(define exec
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (source . ↓args)) env id))))
+
+
+(define pp ; pretty print draft ...
+  (lambda simple [exp]
+    (select (type exp)
+      [['atom 'numeral 'boolean 'rail] (print exp)]
+      ['environment DO_STH]
+      ['closure DO_STH]
+      ['pair DEal_with_cond/let/select/define/lambda/if/block/do]
+      [$T (print exp)])))
+    
+
+;;
+;; 
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

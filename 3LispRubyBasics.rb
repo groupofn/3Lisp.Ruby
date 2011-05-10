@@ -102,6 +102,10 @@ class Object
     handle? && quoted.atom?
   end
 
+  def string_d?
+    handle? && quoted.string?
+  end
+  
   def pair_d? # pair designator?
     handle? && quoted.pair? # ref_type == :PAIR
   end

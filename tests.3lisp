@@ -211,8 +211,8 @@ s                             ; => [1]
 (environment-designator +)              ; Error
 
 ; ENVIRONMENT is the charactersitic function of the type Environment
-; (environment-of (ccons 'x ↑(econs) 'y 'z))  ; => #<Environment:#####>
-; (environment-of +)              ; Error
+(environment-of (ccons 'x ↑(econs) 'y 'z))  ; => #<Environment:#####>
+(environment-of +)              ; Error
 
 (pattern (ccons 'x ↑(econs) 'y 'z))           ; => 'Y
 (pattern ↑(lambda simple [a b] (pcons b a)))  ; => '[A B]
@@ -418,15 +418,15 @@ stash                                         ; => '+
   (lambda reflect! [args env cont]
     (block (rebind 'stash ↑args env) (cont ''ok))))    ; This is what I believe to be the correct version.
 (reflect!-test + (+ 2 2))
-stash                                         ; => '[{Closure: SIMPLE  numbers +} 4]
+stash                                         ; => '[{Primitive closure: SIMPLE  numbers +} 4]
 (reflect!-test . +)
-stash                                         ; => '{Closure: SIMPLE  numbers +}
+stash                                         ; => '{Primitive closure: SIMPLE  numbers +}
 
 (set macro-test
   (lambda macro [arg]
     (block (print ↑arg) arg)))    ; This is what I believe to be the correct version.
 (macro-test (+ 2 2))              ; => 4 ; printing '(+ 2 2)
-(macro-test . [+])                ; => {Closure: SIMPLE  numbers +}; printing '+
+(macro-test . [+])                ; => {Primitive closure: SIMPLE  numbers +}; printing '+
 
 ; rebind test
 (let [[env (bind 'x '1 (bind 'y '2 (econs)))]]
@@ -445,7 +445,7 @@ y                   ; => 4
 
 
 (binding 'y (bind 'x '1 (bind 'y '2 (bind 'z '3 (econs)))))  ; => '2
-(binding 'normalise global)                                 ; => {Closure: SIMPLE ...}
+(binding 'normalise global)                                 ; => {Kernel closure: SIMPLE ...}
 (let [[x (+ 1 2)]]
   ((lambda reflect [args env cont]
     (cont (binding 'x env)))))                              ; => 3
@@ -667,11 +667,11 @@ z                                   ; => '[THREE]
 
 (let [[x '(+ 2 3)]]
   (block (replace (car x) '*)
-         x))
+         x))   ; Error
 
 (let [[x '[a1 a2]]]
   (block (replace 'a1 'a2)
-         x))
+         x))   ; Error
 
 
 ;;; Level Crossing Operations
@@ -739,12 +739,12 @@ z                                   ; => '[THREE]
 (normal-rail '[1 $T "a"])   ; => $T
 (normal-rail '[1 2 A])      ; => $F
 
-(primitive ↑+)              ; => $T
+(primitive ↑+)              ; => $T  ; PRIMITIVE is now a PRIMITIVE
 (primitive ↑normalise)      ; => $F
 (primitive ↑if)             ; => $F
 
-(member ↑ef primitive-closures)  ; => $T
-(member ↑if primitive-closures)  ; => $F
+; (member ↑ef primitive-closures)  ; => $T   ; PRIMITIVE-CLOSURES no longer provided ...
+; (member ↑if primitive-closures)  ; => $F   ; PRIMITIVE-CLOSURES no longer provided ...
 
 ; there are no cond-helper and block-helper
 
@@ -1055,9 +1055,9 @@ if
 
 (define quit (lambda reflect [args env cont] 'done))
 (+ 2 (quit))
-(read-normalise-print "" "" global)
-(read-normalise-print "Ha " "aH " global)
-(read-normalise-print "Blah " "halB " global)
+(read-normalise-print "> " "= " global)
+(read-normalise-print " ~ " " ~ " global)
+(read-normalise-print " ? " " ! " global)
 (quit)
 (quit)
 
@@ -1105,8 +1105,8 @@ b  ; => 10
 (define BREAK 
   (lambda reflect [[arg] env cont]
     (block 
-      (print arg) 
-      (read-normalise-print "DEBUG > "
+      (print "BREAKING at: ") (print arg) (terpri)
+      (read-normalise-print " DEBUG > " " DEBUG = "
         (bind '[env cont return]
               ↑[env cont (lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
               env)))))

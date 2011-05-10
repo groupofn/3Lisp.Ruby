@@ -1,7 +1,5 @@
 # encoding: UTF-8
 
-# [ ] There is a question about REBIND: maybe I should block rebinding of all kernel stuff, on top of blocking replacing ...?
-
 require './3LispClasses.rb'
 
 class ThreeLispPrimitives

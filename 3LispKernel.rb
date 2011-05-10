@@ -136,7 +136,7 @@ module ThreeLispKernel
     :"NORMALISE-RAIL" => [
       :SIMPLE, Rail.new(:RAIL, :ENV, :CONT),
       "
-        (if (empty rail)
+         (if (empty rail)
              (cont (rcons))
              (normalise (1st rail) env
                         (lambda simple [first!]            ; FIRST continuation
@@ -339,6 +339,11 @@ module ThreeLispKernel
     return args_bang.rail_d? && args_bang.length == 1 && args_bang.first.handle_d?
   end
   
+  def plausible_continuation_designator(c_bang)
+    return c_bang.closure_d? && !c_bang.down.reflective? && 
+           (c_bang.down.pattern.atom? || (c_bang.down.pattern.rail? && c_bang.down.pattern.length == 1)) 
+  end
+
   def plausible_arguments_to_normalise?(args_bang)
     return args_bang.rail_d? && 
       args_bang.length == 3 && 
@@ -346,11 +351,14 @@ module ThreeLispKernel
   		(args_bang.second.environment_d?) && 
   		plausible_continuation_designator(args_bang.third)
   end
-    
-  def plausible_continuation_designator(c_bang)
-    return c_bang.closure_d? && !c_bang.down.reflective? && 
-           (c_bang.down.pattern.atom? || (c_bang.down.pattern.rail? && c_bang.down.pattern.length == 1)) 
-  end
 
+  def plausible_arguments_to_rnp?(args_bang)
+    return args_bang.rail_d? && 
+      args_bang.length == 3 && 
+  		args_bang.first.string_d? && 
+      args_bang.second.string_d? &&
+  		args_bang.third.environment_d?
+  end
+    
 end # module ThreeLispKernel
 

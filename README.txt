@@ -1,6 +1,7 @@
 
 [ ] Study prompt-and-read ... make a better API
 
+[ ] There is a question about REBIND: maybe I should block rebinding of all kernel stuff, on top of blocking replacing ...?
 
 [ ] Review treatment of String and Editing ...
 [ ] Align RPP with implementation ;-)

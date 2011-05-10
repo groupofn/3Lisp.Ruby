@@ -1,10 +1,10 @@
 ;;;;;; the 3-Lisp Reflective Processor Program  ;;;;;;
 
 (define READ-NORMALISE-PRINT
-  (lambda simple [read-prompt reply-prompt env]
-    (normalise (prompt&read read-prompt) env
+  (lambda simple [level env]
+    (normalise (prompt&read level) env
       (lambda simple [result]                         ; REPLY continuation
-         (block (prompt&reply result reply-prompt)
+         (block (prompt&reply result level)
                 (read-normalise-print level env))))))
 
 (define NORMALISE
@@ -25,7 +25,7 @@
                          (if (primitive proc!)
                              (cont ↑(↓proc! . ↓args!))
                              (normalise (body proc!)
-                                        (bind (pattern proc!) args! (environment-of proc!))
+                                        (bind (pattern proc!) args! (environment proc!))
                                         cont)))))))))
 
 (define NORMALISE-RAIL
@@ -40,7 +40,7 @@
 
 (define LAMBDA
   (lambda reflect [[kind pattern body] env cont]
-    (reduce kind ↑[↑env pattern body] env cont)))    ; env is normal form
+    (cont (ccons kind env pattern body))))            ; env is normal form
 
 (define IF
   (lambda reflect [[premise c1 c2] env cont]
@@ -53,7 +53,7 @@
     (if (unit clauses)
         (normalise (1st clauses) env cont)
         (normalise (1st clauses) env
-          (lambda simple arg                           ; BLOCK continuation
+          (lambda simple []                           ; BLOCK continuation
             (normalise (pcons 'block (rest clauses)) env cont)))))) 
 
 (define COND
@@ -68,7 +68,7 @@
 
 ; the following should work, because it just bypasses the trapping and expansion of IF
 ;            (normalise (ef ↓1st-condition!
-;		                        (2nd (1st clauses))
+;		                    (2nd (1st clauses))
 ;                           (pcons 'cond (rest clauses))) env cont))))))
  
 ;;;;;; End of the RPP ;;;;;;
