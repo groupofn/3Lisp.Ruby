@@ -241,10 +241,10 @@ parser.parse("
 ;;;;;; the 3-Lisp Reflective Processor Program  ;;;;;;
 
 (define READ-NORMALISE-PRINT
-  (lambda simple [level env]
-    (normalise (prompt&read level) env
+  (lambda simple [read-prompt reply-prompt env]
+    (normalise (prompt&read read-prompt) env
       (lambda simple [result]                         ; REPLY continuation
-         (block (prompt&reply result level)
+         (block (prompt&reply result reply-prompt)
                 (read-normalise-print level env))))))
 
 (define NORMALISE
@@ -265,7 +265,7 @@ parser.parse("
                          (if (primitive proc!)
                              (cont ↑(↓proc! . ↓args!))
                              (normalise (body proc!)
-                                        (bind (pattern proc!) args! (environment proc!))
+                                        (bind (pattern proc!) args! (environment-of proc!))
                                         cont)))))))))
 
 (define NORMALISE-RAIL
@@ -280,7 +280,7 @@ parser.parse("
 
 (define LAMBDA
   (lambda reflect [[kind pattern body] env cont]
-    (cont (ccons kind env pattern body))))            ; env is normal form
+    (reduce kind ↑[↑env pattern body] env cont)))    ; env is normal form
 
 (define IF
   (lambda reflect [[premise c1 c2] env cont]
@@ -293,7 +293,7 @@ parser.parse("
     (if (unit clauses)
         (normalise (1st clauses) env cont)
         (normalise (1st clauses) env
-          (lambda simple []                           ; BLOCK continuation
+          (lambda simple arg                           ; BLOCK continuation
             (normalise (pcons 'block (rest clauses)) env cont)))))) 
 
 (define COND
@@ -302,7 +302,7 @@ parser.parse("
         (cont 'error)
         (normalise (1st (1st clauses)) env
           (lambda simple [1st-condition!]             ; COND continuation
-            (if ↓1st-condition!                       ; would ef work here? ... no! 
+            (if ↓1st-condition!                       
                 (normalise (2nd (1st clauses)) env cont)
                 (normalise (pcons 'cond (rest clauses)) env cont)))))))
  

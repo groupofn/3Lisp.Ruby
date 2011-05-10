@@ -62,7 +62,7 @@
         (cont 'error)
         (normalise (1st (1st clauses)) env
           (lambda simple [1st-condition!]             ; COND continuation
-            (if ↓1st-condition!                       ; would ef work here? ... no! 
+            (if ↓1st-condition!                       
                 (normalise (2nd (1st clauses)) env cont)
                 (normalise (pcons 'cond (rest clauses)) env cont)))))))
 
