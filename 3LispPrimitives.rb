@@ -123,7 +123,7 @@ class ThreeLispPrimitives
           print args.first.down.to_s
         end
         Handle.new(:OK)}],
-      [:TERPRI, :SIMPLE, Rail.new, lambda{|args| print "\n"; Handle.new(:OK) }],
+#      [:TERPRI, :SIMPLE, Rail.new, lambda{|args| print "\n"; Handle.new(:OK) }], # not needed any more
       [:INTERNALISE, :SIMPLE, Rail.new(:string), lambda{|args|
         parsed = parser.parse(args.first)
         raise_error(self, "Failed to internalise string: #{args.first}") if parsed.empty?

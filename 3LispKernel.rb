@@ -58,15 +58,19 @@ module ThreeLispKernel
     [:"PAIR", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'pair)"],
 
     [:"PROMPT&READ", :SIMPLE, Rail.new(:PROMPT), "
-        (read $T prompt)
+       (read $T prompt)
     "],
   
     [:"PROMPT&REPLY", :SIMPLE, Rail.new(:"RESULT!", :PROMPT), "
-      (block
-        (print result! $T prompt)
-        (terpri))  
+      (print result! $T prompt)
+      (newline)
     "],
 
+    [:"NEWLINE", :SIMPLE, Rail.new, '
+      (print "
+")
+    '],
+    
     [:"RAIL", :SIMPLE, Rail.new(:EXP), "(= (type exp) 'rail)"],
 
     [:"REFLECTIVE", :SIMPLE, Rail.new(:CLOSURE), "(= (procedure-type closure) 'reflect)"],

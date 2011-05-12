@@ -1,6 +1,6 @@
 # encoding: UTF-8
 
-require '3LispError.rb'
+require './3LispError.rb'
 
 class Rail
   include ThreeLispError

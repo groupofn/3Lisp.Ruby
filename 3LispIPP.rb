@@ -1,15 +1,9 @@
 # encoding: UTF-8
 
-# [x] Fix up READ-PROMPT and REPLY-PROMPT
-# [x] Study env, cont etc as member variables ...
-# [x] Update RPP code ...
-# [x] Test all
-# [ ] Fix up GitHub ...
-# [ ] Write comments ...
-# [ ] Write implementation notes ... 
-# [ ] DONE
-# [ ] Further optimization is possible with (1) less construction of IPP_ARGS, (2) simplification of continuation construction,
-#     and (3) eliminating unnecessary extractions.
+# [ ] Further optimization is possible through 
+#     (1) less construction of IPP_ARGS, 
+#     (2) simplification of continuation construction, and
+#     (3) eliminating unnecessary extractions.
 
 require './3LispError.rb'
 require './3LispReader.rb'

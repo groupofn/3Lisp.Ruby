@@ -506,7 +506,7 @@ y                   ; => 4
   (print "2 ")
   (print "+ ")
   (print "2 ")
-  (terpri)
+  (newline)
   'done)                  ; => 'DONE; displaying "2 + 2 "
 
 (catch (+ 2 2))           ; => 4
@@ -630,7 +630,7 @@ y                   ; => 4
               (print ↑x) 
               (print "and ") 
               (print ↑y) 
-              (terpri) 
+              (newline) 
               (+ x y))))
 (inc 99)                                ; => 100; printing "adding up 99 and 1"
 
@@ -1012,7 +1012,7 @@ if
 ;;; Control flow
 ;;;
 
-(block (terpri) (terpri) (terpri))
+(block (newline) (newline) (newline))
 
 (ef (= 1 1) (+ 3 3) (* 3 3))
 
@@ -1105,7 +1105,7 @@ b  ; => 10
 (define BREAK 
   (lambda reflect [[arg] env cont]
     (block 
-      (print "BREAKING at: ") (print arg) (terpri)
+      (print "BREAKING at: ") (print arg) (newline)
       (read-normalise-print " DEBUG > " " DEBUG = "
         (bind '[env cont return]
               ↑[env cont (lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
@@ -1121,19 +1121,6 @@ b  ; => 10
 ; use "(return EXP)" to exit BREAK
 (factorial-with-break-point 5)
 
-;;; Reflective continuation vs. regular (simple) continuation
-
-(define quote (lambda reflect [[a] e c] (c ↑a)))
-(normalise '1 global id)
-(normalise '1 global quote)
-(normalise '+  global id)
-(normalise '+ global quote)
-(normalise '(+ 1 2) global id)
-(normalise '(+ 1 2) global quote)
-(normalise-rail '[] global id)
-(normalise-rail '[] global quote)
-(normalise-rail '[1] global id)
-(normalise-rail '[1] global quote)
 
 ;;; More reflective continuation
 
@@ -1157,6 +1144,125 @@ b  ; => 10
 
 (normalise-rail '[] global alpha)
 (normalise '(lambda simple [a] (+ a a)) global alpha)
+
+
+; Nasty ones from the Manual pp.94-97
+
+; 1. Replacing a simple closure with a reflective one. The test 
+;    for reflectiveness is done prior to normalizing the arguments. 
+;    Hence, changing a simple closure into a reflective one during 
+;    argument normalization will not have an immediate effect.
+
+(set foo (lambda simple [x](+ x 1)))
+(set fee (lambda reflect [x] (- x 1)))
+(foo 100)       ; => 101
+(foo (block (replace ↑foo ↑fee) 100)) ; => 99 ; but still runs using fee's body!
+(foo 100)       ; Error
+
+
+; 2. Using reflective procedures as continuations. The effect 
+;    of using a reflective procedure as a continuation is bizarre 
+;    but predictable!
+
+(normalise '1 global id)              ; => '1 
+(normalise '1 global quote)           ; => 'EXP                 ; From line 9 [?] of the RPP
+(normalise '+  global id)             ; => '{Primitive closure: ...}
+(normalise '+ global quote)           ; => '(BINDING EXP ENV)   ; From line 10 [?]
+(normalise '(+ 1 2) global id)        ; => '3
+(normalise '(+ 1 2) global quote)     ; => '↑(↓PROC! . ↓ARGS!)  ; From line 22 [?]
+(normalise-rail '[] global id)        ; => '[]
+(normalise-rail '[] global quote)     ; => '(RCONS)             ; From line 29 [?]
+(normalise-rail '[1] global id)       ; => '[1]
+(normalise-rail '[1] global quote)    ; => '(PREP FIRST! REST!) ; From line 34 [?]
+
+
+; 3. Smashing a continuation. An implemcntation may not trust the procedure 
+;    type of a continuation - it can be changed on the fly.
+
+NOT YET PASSED!
+
+(let [[dummy-id (lambda simple [x] x)]]
+  (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
+
+(let [[dummy-id (lambda simple [x] x)]]
+  (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))     ; => '''OK
+
+; 4. Tampering with the environment of a continuation closure. The environment designator 
+;    within a standard continuation closure can be changed, making it non-standard. In the 
+;    following, a new binding for NORMALISE is stuffed into a C-ARGS! closure; this binding 
+;    will be used when it comes to expanding the closure. 
+
+NOT YET PASSED!
+
+(define change-cont
+  (lambda reflect [[exp] env cont]
+    (block
+      (push ['normalise ↑(lambda simple [a e c] (c ↑a))]
+            (environment-of ↑cont))
+      (normalise exp env cont))))
+
+((lambda simple x (print 'hello)) . (change-cont (+ 2 2)))
+
+
+; 5. Sharing of cnvironment tails betwccn C-PROC! and C-ARGS! continuations. A C-ARGS! 
+;    closure contains an environment designator whose first tail is the environment 
+;    designator captured by the corresponding C-PROC! closure.
+
+(define save-cont
+  (lambda reflect [[var exp] env cont]
+    (block (rebind var ↑↑cont env)
+           (normalise exp env cont))))
+
+((save-cont x1 -) . (save-cont x2 [1]))       ; => -1
+
+x1                                            ; => '{Kernel closure: ... } ; PROC-CONTINUATION
+
+x2                                            ; => '{Kernel closure: ... } ; ARGS-CONTINUATION
+
+; (= (environment-designator x1) (rest (environment-designator x2)))  ; this cannot be tested in 3LispR
+
+
+; 6. Fresh	top~level	continuations. Each time through READ-NORMALIZE-PRINT	a	new	
+;    REPLY-CONTINUATION closure is created.
+
+(define save-cont
+  (lambda reflect [[var exp] env cont]
+    (block (rebind var ↑↑cont env)
+           (normalise exp env cont))))
+
+(save-cont x1 x1)                             ; => '{Kernel closure: ... } ; REPLY-CONTINUATION
+(save-cont x2 x2)                             ; => '{Kernel closure: ... } ; REPLY-CONTINUATION 
+(= x1 x2)                                     ; => $F
+(= (pattern x1) (pattern x2))                 ; => $T
+(= (body x1) (body x2))                       ; => $T
+(= (environment-designator x1) (environment-designator x2))   ; => $F
+(= (environment-of x1) (environment-of x2))   ; => $T
+
+THE LAST ONE NOT PASSED YET!
+
+
+7. good.
+
+(normalise '(normalise '10 global print) global quote)  ; => '↑(↓PROC! . ↓ARGS!)
+
+
+8. blocked now ...
+
+(set normalise 10)
+
+9. weird???
+
+(set x (body ↑atom))
+x
+'(= (type x) 'atom)
+(rplaca x 'rcons)
+
+
+10.  investigate regarding efficiency.
+
+(set x (rcons '1))
+(block (replace (foot x) x) 'done)
+(block (normalise x global id) 'done)
 
 ;;;
 ;;; Reflection

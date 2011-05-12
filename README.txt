@@ -1,57 +1,9 @@
 
-[ ] Study prompt-and-read ... make a better API
+              3LispR - A Ruby Implementation of 3Lisp 
 
-[ ] There is a question about REBIND: maybe I should block rebinding of all kernel stuff, on top of blocking replacing ...?
-
-[ ] Review treatment of String and Editing ...
-[ ] Align RPP with implementation ;-)
-
-Thoughts on primitives related to editing, reading and parsing of files:
-
-[1] (system "..." "..." ...) => returns STDOUT as a string.
-
-[1.1] SOURCE ... PRIMITIVE
-
-[2] (parse "...") => a rail of expressions/structures
-         
-[3] EDIT
-
-(define edit
-  (lambda simple args
-    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
-          [editor (if (> (length args) 1) (2nd args) "vi")]]
-      (system editor file))))
-
-(define editsource
-  (lambda simple args
-    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
-          [editor (if (> (length args) 1) (2nd args) "vi")]]
-      (block 
-        (system editor file) 
-        (source file)))))
-  
-[4] EDEX
-
-(define edex
-  (lambda reflect [args env cont]
-    (cont (normalise-rail (parse (editsource . ↓args)) env id))))
-
-(define edex
-- >     (lambda reflect [args env cont]
-- >         (cont (normalise-rail (edre . ↓args) env id))))
-
-
-[5] EDITDEF
-
-generate formatted to_s from closure or other structure ... i.e. pretty print.
-use editor to edit it ...; change definition ...
-
-
-                     3Lisp - Ruby Implementation
-
-                           2011-03-12
+                           2011-05-13
                            
-The package includes a preliminary version of a Ruby implementation of 
+The package includes a BETA version of a Ruby implementation of 
 3Lisp. The implementation follows that described in des Riviers 
 & Smith (1984) and replicates the basic parts of 3Lisp as described
 in the Interim 3-Lisp Reference Manual.
@@ -133,17 +85,56 @@ To exit from 3LispR, use (exit) at the pormpt:
 
       0> (exit)
 
-5. Editing in 3LispR
+5. Editing and Command History in 3LispR
 
 3LispR comes with a simple command prompt editor in which you can use 
 the following keys:
 
 - Esc:    abandon inputs & edits and return to the command prompt
-- Arrows: move the caret
 - Return: if (i) caret is on the currently last line and parenstheses 
           and brackets inputted so far match respectively, then what 
           is currently in the editor buffer is processed as 3Lisp 
           expression.
+- Arrows: move the caret
+
+- Shift-HOME, Shift-END
+- Shift-PAGEUP, shift-PAGEDOWN
+
+6. External Editors and Executing Files
+
+[1] (system "..." "..." ...) => returns the exit status as a string.
+
+[1.1] SOURCE ... PRIMITIVE
+
+[2] (parse "...") => a rail of expressions/structures
+         
+[3] EDIT
+
+(define edit
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (sys editor file))))
+
+(define editsource
+  (lambda simple args
+    (let [[file (if (> (length args) 0) (1st args) "temp.3lisp")]
+          [editor (if (> (length args) 1) (2nd args) "vi")]]
+      (block 
+        (sys editor file) 
+        (source file)))))
+
+[4] EDEX
+  
+(define edex
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (editsource . ↓args)) env id))))
+
+(define exec
+  (lambda reflect [args env cont]
+    (cont (normalise-rail (parse (source . ↓args)) env id))))
+  
+
 
 6. init.3lisp
 
@@ -165,6 +156,10 @@ sense of how 3Lisp works is to try these cases and their variations.
 This version of 3LispR -- including its editor, parser and 
 processor -- was mostly tested only through Jun's idiosyncratic use. 
 There may be many lurking surprises for you!
+
+Please use it and play with it and let me know if you want any 
+improvemet anywhere.
+
 
 
 
