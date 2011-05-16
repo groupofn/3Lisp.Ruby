@@ -11,7 +11,7 @@ class Rail
     if args.size == 0 
       self.element = nil
       self.remaining = nil
-    else
+    else      
       self.element = args[0]
       self.remaining = Rail.new(*args[1..-1])
     end

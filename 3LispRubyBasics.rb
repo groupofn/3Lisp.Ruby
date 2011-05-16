@@ -136,8 +136,19 @@ class Object
     return false if atom_d? || pair_d?
 
   	if rail_d?
+
+# alternative 1: leading to infinite loop on circular structure 
+      r = self.quoted
+      while !r.empty?
+        return false unless r.first.up.normal?
+        r = r.rest
+      end
+      return true
+      
+=begin # alternative 2: leading to SystemStackError on circular structure 
 	    quoted.each {|item| return false unless item.up.normal? }
 	    return true
+=end
 	  end 
 
     return true # i.e. [:NUMERAL, :BOOLEAN, :HANDLE, :CLOSURE, :STRING :ENVIRONMENT].include?(ref_type)

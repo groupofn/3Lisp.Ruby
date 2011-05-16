@@ -136,6 +136,11 @@
 (map 1 [1 2 3])             ; Error
 (map 1+ 100)                ; Error
 
+(map + [1 2 3 4 5 6 7 8 9] [1 2 3 4 5 6 7 8 9])
+(map 1+ [1 2 3 4 5 6 7 8 9])
+
+
+
 (COPY-VECTOR '[A B C])        ; '[A B C]
 (COPY-VECTOR	[])             ; []
 (LET [[Y [1 2 3]]]
@@ -1012,22 +1017,26 @@ if
 ;;; Control flow
 ;;;
 
-(block (newline) (newline) (newline))
+(block (newline) (newline) (newline)) ; => 'OK
 
-(ef (= 1 1) (+ 3 3) (* 3 3))
+(ef (= 1 1) (+ 3 3) (* 3 3))        ; => 6
 
 (cond
 	[(= 1 2) 'ha]
 	[(not (= (* 3 3) (/ 18 2))) (empty [])]
-	[$T 'blah])
+	[$T 'blah])                       ; => 'BLAH
 
-((if (even 3) + -) 4 5)
-((nth 2 [+ if lambda]) $T 0 1)
+((if (even 3) + -) 4 5)             ; => -1
+((nth 2 [+ if lambda]) $T 0 1)      ; => 0
 
 ;;;
 ;;; Control flow
 ;;;
 ;;;;;;;;;;;;;;;;;;;
+
+; PRIMITIVE as continuation
+
+(normalise '10 global print)
 
 
 ;;;;;;;;;;;;;;;;;
@@ -1063,7 +1072,7 @@ if
 
 ; environment manipulation
 
-((lambda reflect [[x] env cont] (normalise '(+ x 1) (bind 'x x env) cont)) 10)
+((lambda reflect [[x] env cont] (normalise '(+ x 1) (bind 'x x env) cont)) 10)  ; => 11
 
 ;;; DEFINE can be defined
 
@@ -1111,15 +1120,15 @@ b  ; => 10
               ↑[env cont (lambda reflect [[a2] e2 c2] (normalise a2 e2 cont))]
               env)))))
 
-(define factorial-with-break-point 
+(define factorial-break 
   (lambda simple [x] 
     (if 
       (= x 0) 
       1 
-      (break (* x (factorial-with-break-point (- x 1))))))) ; uses BREAK
+      (break (* x (factorial-break (- x 1))))))) ; uses BREAK
 
 ; use "(return EXP)" to exit BREAK
-(factorial-with-break-point 5)
+(factorial-break 5)
 
 
 ;;; More reflective continuation
@@ -1176,23 +1185,47 @@ b  ; => 10
 (normalise-rail '[1] global quote)    ; => '(PREP FIRST! REST!) ; From line 34 [?]
 
 
-; 3. Smashing a continuation. An implemcntation may not trust the procedure 
+; 3. Smashing a continuation. An implementation may not trust the procedure 
 ;    type of a continuation - it can be changed on the fly.
 
-NOT YET PASSED!
+; Should this be allowed to go through?
 
 (let [[dummy-id (lambda simple [x] x)]]
   (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
 
+(set di (lambda simple [struct] struct)) 
+(normalise `(id (replace ,↑↑di ↑quote)) global di)
+
+(set di (lambda simple [struct] struct)) 
+(normalise `(replace ↑di ↑quote) global di)
+
+
 (let [[dummy-id (lambda simple [x] x)]]
-  (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))     ; => '''OK
+  (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
+
+(normalise '1 global quote)
+
+(normalise '1 global (lambda reflect [[a] e c] (c ↑a)))
+
+(set di (lambda simple [struct] struct)) 
+(set uup (lambda simple [x] (up x)))
+(normalise `(id (replace ,↑↑di ↑uup)) global di)
+
+(let [[dummy-id (lambda simple [x] (print ↑x))]]
+  (normalise `(id (replace ,↑↑dummy-id ↑uup)) global dummy-id))     ; => '''OK
+
+((lambda simple [dummy-id]
+   (normalise `(id (replace ,↑↑dummy-id ↑uup)) global dummy-id))
+ (lambda simple [x] (print ↑x)))
+
 
 ; 4. Tampering with the environment of a continuation closure. The environment designator 
 ;    within a standard continuation closure can be changed, making it non-standard. In the 
 ;    following, a new binding for NORMALISE is stuffed into a C-ARGS! closure; this binding 
 ;    will be used when it comes to expanding the closure. 
 
-NOT YET PASSED!
+
+; Manual version:
 
 (define change-cont
   (lambda reflect [[exp] env cont]
@@ -1203,8 +1236,26 @@ NOT YET PASSED!
 
 ((lambda simple x (print 'hello)) . (change-cont (+ 2 2)))
 
+; Can't really do the above in the 3LispR version ...
 
-; 5. Sharing of cnvironment tails betwccn C-PROC! and C-ARGS! continuations. A C-ARGS! 
+(define prn
+  (lambda simple [x] (print x)))
+
+(define change-cont
+  (lambda reflect [[exp] env cont]
+    (block
+      (replace 
+        ↑cont
+        (ccons (procedure-type ↑cont) 
+               ↑(bind 'prn ↑(lambda simple [x] (block (print x) (newline))) (environment-of ↑cont))
+               (pattern ↑cont)
+               (body ↑cont)))
+      (normalise exp env cont))))
+
+((lambda simple x (print 'hello)) . (change-cont (+ 2 2)))
+
+
+; 5. Sharing of environment tails betwccn C-PROC! and C-ARGS! continuations. A C-ARGS! 
 ;    closure contains an environment designator whose first tail is the environment 
 ;    designator captured by the corresponding C-PROC! closure.
 
@@ -1236,33 +1287,46 @@ x2                                            ; => '{Kernel closure: ... } ; ARG
 (= (pattern x1) (pattern x2))                 ; => $T
 (= (body x1) (body x2))                       ; => $T
 (= (environment-designator x1) (environment-designator x2))   ; => $F
-(= (environment-of x1) (environment-of x2))   ; => $T
-
-THE LAST ONE NOT PASSED YET!
+(= (environment-of x1) (environment-of x2))   ; => $F  ; The manual got this one wrong!
 
 
-7. good.
+; 7. Using a primitive as a continuation with a reflective continuation over it. Care must 
+;    be taken in such cases because the primitive may never get invoked.
 
 (normalise '(normalise '10 global print) global quote)  ; => '↑(↓PROC! . ↓ARGS!)
 
+(normalise '10 global print)                            ; => 'OK ; display 10
 
-8. blocked now ...
+
+; 8. Rebinding a kernel procedure in the global environment. This is almost always fatal.
+
+; In 3LispR, this is blcoked now.
+
+;;; blocked now ...
 
 (set normalise 10)
 
-9. weird???
+; 9. Smashing a kernel procedure, its body, or its pattern. This too is usually fatal.
 
-(set x (body ↑atom))
-x
-'(= (type x) 'atom)
+(set x (body ↑atom)) 
+x                       ; => '(= (TYPE EXP) 'ATOM)
 (rplaca x 'rcons)
 
+; This one is still a trouble maker ... Not an obvious way to avoid it ..
 
-10.  investigate regarding efficiency.
+
+; 10. Clobbering the global environment. The global environment rail must always be 
+;     in normal form;	otherwise,	(environment proc!)	on line 24 [?] would error on all 
+;     standard procedures.
+
+(replace (foot ↑global) '[hal])  ; This no longer applies.
+
+; 11.Circular rails can cause NORMALISE to hang - even normal-form ones.
 
 (set x (rcons '1))
 (block (replace (foot x) x) 'done)
 (block (normalise x global id) 'done)
+
 
 ;;;
 ;;; Reflection

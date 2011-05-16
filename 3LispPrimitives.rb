@@ -17,18 +17,16 @@ class ThreeLispPrimitives
 
   def initialize_primitives
     primitive_bindings = {}
-    primitive_closures = Rail.new
     primitive_names = []
+    
     primitive_parts.each { |p|
-      # circular closures: quoted atoms used as the body
-      # defining env is empty
-      # ruby lambda given as primitive_body
-      c_up = Closure.new(p[1], nil, p[2], p[0], :Primitive, p[0], p[3]).up      
       primitive_names.push(p[0]) 
       
-      # these last two must share the same c_up
-      primitive_closures.push(c_up)
-      primitive_bindings[p[0].up] = c_up 
+      e = Environment.new
+      c = Closure.new(p[1], e, p[2], Pair.new(p[0], p[2]), :Primitive, p[0], p[3]) 
+      
+      c.environment.local[p[0]] = c 
+      primitive_bindings[p[0]] = c 
     }
 
     return primitive_bindings, primitive_names
@@ -140,13 +138,13 @@ class ThreeLispPrimitives
         raise_error(self, "DOWN expects a normal-form structure but was given #{args.first.to_s}") if !args.first.normal?
         result = args.first.down
         return result }],
+# should REPLACE be made to work with Environment also?
       [:REPLACE, :SIMPLE, Rail.new(:struc1, :struc2), lambda{|args|
         s1_rt = args.first.ref_type; s2_rt = args.second.ref_type
         raise_error(self, "REPLACE expects structures of the same type") if s1_rt != s2_rt
         raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
         case s1_rt
         when :RAIL
-          raise_error(self, "PRIMITIVE-CLOSURES is kernel and cannot be changed") if args.first.quoted.equal?($primitive_closures)      
           args.first.rplact(0, args.second.tail(0))
         when :PAIR
           args.first.rplaca(args.second.car)
@@ -313,7 +311,7 @@ class ThreeLispPrimitives
         raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
         args.first.down.kind.up }],
       [:PRIMITIVE, :SIMPLE, Rail.new(:closure), lambda{|args|
-        raise_error(self, "PROCEDURE-TYPE expects a closure.") if !args.first.closure_d?
+        raise_error(self, "PRIMITIVE expects a closure.") if !args.first.closure_d?
         args.first.down.primitive? }],
     
       [:ECONS, :SIMPLE, Rail.new(:env), lambda{|args| 
@@ -324,7 +322,7 @@ class ThreeLispPrimitives
       [:BINDING, :SIMPLE, Rail.new(:var, :env), lambda{|args| 
         raise_error(self, "BINDING expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
         raise_error(self, "BINDING expects an environment but was given #{args.second.to_s}") if !args.second.environment?
-        args.second.binding(args.first) }],
+        args.second.binding(args.first.down).up }],
       [:BIND, :SIMPLE, Rail.new(:pat, :bindings, :env), lambda{|args|
     #    raise_error(self, "BIND expects an pattern designator but was given #{args.first.to_s}") if !args.first.rail_d?
         raise_error(self, "BIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
@@ -337,11 +335,11 @@ class ThreeLispPrimitives
         if args.third.equal?(@IPP.global_env) && @IPP.reserved_names.include?(args.first.down)  
           raise_error(self, "Kernel or primitive name '#{args.first.down}' cannot be rebound in the global environment")
         end
-        args.third.rebind_one(args.first, args.second) }],
+        args.third.rebind_one(args.first.down, args.second.down) }],
       [:BOUND, :SIMPLE, Rail.new(:var, :env), lambda{|args|
         raise_error(self, "BOUND expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
         raise_error(self, "BOUND expects an environment but was given #{args.second.to_s}") if !args.second.environment?
-        args.second.var_is_bound?(args.first) }],
+        args.second.var_is_bound?(args.first.down) }],
       [:"BOUND-ATOMS", :SIMPLE, Rail.new(:env), lambda{|args|
         raise_error(self, "BOUND expects an environment but was given #{args.first.to_s}") if !args.first.environment?
         args.first.bound_atoms }], # returns a sequence of atom designators

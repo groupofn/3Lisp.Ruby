@@ -54,6 +54,8 @@ class Closure
   end
 
   def extract(variable)
-    environment.binding(variable).down
+    environment.binding(variable)
   end
 end
+
+

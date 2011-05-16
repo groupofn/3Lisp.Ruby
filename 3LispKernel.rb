@@ -16,7 +16,7 @@ module ThreeLispKernel
     kernel_utility_names = []
     kernel_utility_bindings = {}
     KERNEL_UTILITY_PARTS.each { |e|
-      kernel_utility_bindings[e[0].up] = Closure.new(e[1], env, e[2], parser.parse(e[3]).first, :KernelUtility, e[0]).up
+      kernel_utility_bindings[e[0]] = Closure.new(e[1], env, e[2], parser.parse(e[3]).first, :KernelUtility, e[0])
       kernel_utility_names << e[0]
     }
     return kernel_utility_bindings, kernel_utility_names
@@ -91,7 +91,7 @@ module ThreeLispKernel
     ppp_bindings = {}
     RPP_PROC_PARTS.keys.each {|name|
       parts = RPP_PROC_PARTS[name]
-      ppp_bindings[name.up] = Closure.new(parts[0], env, parts[1], parser.parse(parts[2]).first, :PPP, name).up
+      ppp_bindings[name] = Closure.new(parts[0], env, parts[1], parser.parse(parts[2]).first, :PPP, name)
       ppp_names << name
     }
     return ppp_bindings, ppp_names
@@ -352,7 +352,7 @@ module ThreeLispKernel
     return args_bang.rail_d? && 
       args_bang.length == 3 && 
   		args_bang.first.handle_d? && 
-  		(args_bang.second.environment_d?) && 
+  		args_bang.second.environment_d? && 
   		plausible_continuation_designator(args_bang.third)
   end
 

@@ -1,7 +1,9 @@
 # encoding: UTF-8
 
-class ExpReader
+require './3LispError.rb'
 
+class ExpReader
+  
   def initialize
     @history = [] # an Array of lines, each of which corresponds to a processed expression
     @line_prefix = "- > "    

@@ -8,7 +8,7 @@ class Environment
   # @local is a hash; @tail is either an environment or an empty hash
   attr_accessor :local, :tail
 
-  def initialize(local, tail)
+  def initialize(local = {}, tail = {})
     self.local, self.tail = local, tail
   end
   
@@ -22,8 +22,8 @@ class Environment
 
   def bound_atoms
     return Rail.new if empty?
-    return Rail.array2rail(local.keys) if tail.empty?
-    return Rail.array2rail(local.keys).join(tail.bound_atoms)
+    return Rail.new(*local.keys.map(&:up)) if tail.empty?
+    return Rail.new(*local.keys.map(&:up)).join(tail.bound_atoms)
   end
   
   def var_is_bound?(var)
@@ -70,7 +70,7 @@ protected
   # see diss.p.411 & diss.p.559
   def bind_pattern_helper(newbindings, pattern, args)
     if pattern.atom_d?
-      newbindings[pattern] = args
+      newbindings[pattern.down] = args.down
     else
 =begin slower version -- using map 
       pattern = pattern.down.map(&:up) if pattern.rail_d?

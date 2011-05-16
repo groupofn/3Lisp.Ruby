@@ -609,6 +609,14 @@
 ;; Special Utilities  
 ;;
 
+
+(define println
+  (lambda simple args 
+    (block
+      (print . args)
+      (newline))))
+
+
 ;; create the load and edit stuff as in the manual 
 
 (define edit
