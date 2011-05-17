@@ -1,5 +1,6 @@
 # encoding: UTF-8
 
+require 'set'
 require './3LispClasses.rb'
 require './3LispError.rb'
 
@@ -11,7 +12,7 @@ SPACE = " "
 TAB = "\t"
 NEWLINE = "\n"
 CARRIAGE_RETURN = "\r"
-SPACES = [SPACE, NEWLINE, CARRIAGE_RETURN, TAB]
+SPACES = Set.new [SPACE, NEWLINE, CARRIAGE_RETURN, TAB]
 
 COMMENT_START = ";"
 SEPARATORS = SPACES + [COMMENT_START]
@@ -37,7 +38,7 @@ DOWN = "↓" # unicode 0x2193
 TRUE_NAME = "$T"
 FALSE_NAME = "$F"
 
-SPECIAL = [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, NAME_START, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
+SPECIAL = Set.new [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, NAME_START, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
            STRING_START, STRING_END]
 
 # Numeral
@@ -45,8 +46,8 @@ SPECIAL = [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, NAME_START, U
 PLUS = "+"
 MINUS = "-"
 
-SIGNS = [PLUS, MINUS]
-DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+SIGNS = Set.new [PLUS, MINUS]
+DIGITS = Set.new ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 class ThreeLispInternaliser
   include ThreeLispError
@@ -71,8 +72,27 @@ class ThreeLispInternaliser
       self.column += 1
     end
   end
+  
+  def separator?(ch)
+    ch == SPACE || ch == NEWLINE || ch == COMMENT_START || ch == CARRIAGE_RETURN || ch == TAB
+  end
+  
+  def special?(ch)
+    ch == PAIR_START || ch == PAIR_END || ch == RAIL_START || ch == RAIL_END || ch = PAIR_BREAK || ch == NAME_START ||
+    ch == UP || ch == DOWN || ch == QUOTE || ch == BACKQUOTE || ch == COMMA || ch == STRING_START || ch == STRING_END
+  end
+  
+  def sign?(ch)
+    ch == MINUS || ch == PLUS
+  end
+  
+  def digit?(ch)
+    ch == "0" || ch == "1" || ch == "2" || ch == "3" || ch == "4" ||
+    ch == "5" || ch == "6" || ch == "7" || ch == "8" || ch == "9"
+  end
 
   def skip_separators
+#    while !source.empty? && separator?(source[0]) 
     while !source.empty? && SEPARATORS.include?(source[0])
       @ch = source.slice!(0)
       if @ch == NEWLINE
@@ -98,7 +118,7 @@ class ThreeLispInternaliser
         self.column += 1
       end
     end
-    raise_error(self, "Line #{line} Column #{column}: " + STRING_END + " expected.", ThreeLispSyntaxError) if source.empty?
+    raise_error(self, "Line #{line} Column #{column}: " << STRING_END << " expected.", ThreeLispSyntaxError) if source.empty?
     source.slice!(0); self.column += 1 # absorb STRING_END
     return s
   end
@@ -118,7 +138,7 @@ class ThreeLispInternaliser
       cdr = internalise_exp(bqlevel)
       skip_separators
       if source.empty? || source[0] != PAIR_END
-        raise_error(self, "Line #{line} Column #{column}: " + PAIR_END + " expected.", ThreeLispSyntaxError) 
+        raise_error(self, "Line #{line} Column #{column}: " << PAIR_END << " expected.", ThreeLispSyntaxError) 
       end
     elsif source[0] == PAIR_END
       cdr = Rail.new
@@ -135,7 +155,7 @@ class ThreeLispInternaliser
       skip_separators
       if source.empty?
         if ending.length > 0        
-          raise_error(self, "End of input reached while expecting '" + ending + "'.", ThreeLispSyntaxError)
+          raise_error(self, "End of input reached while expecting '" << ending << "'.", ThreeLispSyntaxError)
         else
           return exps
         end
@@ -168,6 +188,7 @@ class ThreeLispInternaliser
       n = "" << @ch
       
       while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])        
+#      while !source.empty? && !separator?(source[0]) && !special?(source[0])        
         n << source.slice!(0); self.column += 1 
       end
 
@@ -192,11 +213,14 @@ class ThreeLispInternaliser
       
       digits_only = true
       while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])
-        s << @ch = source.slice!(0); self.column += 1 
+#      while !source.empty? && !separator?(source[0]) && !special?(source[0])
+         s << @ch = source.slice!(0); self.column += 1 
         digits_only = false if !DIGITS.include?(@ch)
+#        digits_only = false if !digit?(@ch)
       end
 
       if digits_only && (DIGITS.include?(init_char) || (SIGNS.include?(init_char) && s.length > 1))
+#      if digits_only && (digit?(init_char) || (sign?(init_char) && s.length > 1))
         result = s.to_i
       else 
         result = s.upcase.to_sym

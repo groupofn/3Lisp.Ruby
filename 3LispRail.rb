@@ -1,35 +1,61 @@
 # encoding: UTF-8
 
+# This version allows shared tail, but forbids mutation of tail.
+
 require './3LispError.rb'
+require './3LispPair.rb'
+require './3LispHandle.rb'
 
 class Rail
   include ThreeLispError
 
-  attr_accessor :element, :remaining
+  attr_accessor :list, :length, :last
 
   def initialize(*args)
-    if args.size == 0 
-      self.element = nil
-      self.remaining = nil
-    else      
-      self.element = args[0]
-      self.remaining = Rail.new(*args[1..-1])
+    self.list = Pair.new(nil, nil)
+    self.length = args.size
+    current = list
+    i = 0
+    while i < length
+      current.car = args[i]
+      current.cdr = Pair.new(nil, nil)
+      current = current.cdr
+      i += 1
     end
+    self.last = current
   end
   
   def empty?
-    element == nil
+    length == 0
+  end
+
+  def eq?(other)
+    return false if other.struc_type != :RAIL
+    return false if length != other.length
+    
+    s = list; o = other.list
+    i = 0
+    while i < length
+      return false if !s.car.eq?(o.car);
+      s = s.cdr; o = o.cdr
+      i += 1 
+    end
+    return true
   end
 
   def to_s
-    "[" + (empty? ? "" : (element.to_s + remaining.r_to_s)) + "]"
-  end
-protected  
-  def r_to_s
-    empty? ? "" : (" " + element.to_s + remaining.r_to_s)
+    s = "["
+    current = list
+    i = 0
+    while i < length
+      s << current.car.to_s << " "
+      current = current.cdr
+      i += 1
+    end
+    s.chop! if (length > 0) 
+    s << "]"
   end
   
-public
   def self.scons(args)
     args.map{|element|       
       element
@@ -37,78 +63,114 @@ public
   end
 
   def self.rcons(args)
-    args.map{|element| 
+    Handle.new(args.map{|element| 
       raise_error(self, "RCONS expects structure but was given #{element.to_s}") if !element.handle?     
-      element.down
-    }.up
-  end
-
-  def self.array2rail(arr)
-    r = Rail.new
-    t = r
-    for i in 0..arr.length-1
-      t.element = arr[i]
-      t.remaining = Rail.new
-      t = t.remaining
-    end
-    return r
+      element.quoted
+    })
   end
 
   def prep(e)
-    r = Rail.new
-    r.element = e
-    r.remaining = self
-    return r
+    new_rail = Rail.new
+    new_rail.list = Pair.new(e, list)
+    new_rail.length = length + 1
+    new_rail.last = last
+    return new_rail
   end
 
   def map(&block)
-    if empty?
-      Rail.new
-    else
-      e = block.call(element)
-      remaining.map(&block).prep(e) 
+    new_rail = Rail.new
+
+    current = list
+    nr_current = new_rail.list
+    i = 0
+    while i < length do
+      nr_current.car = block.call(current.car)
+      nr_current.cdr = Pair.new(nil, nil) 
+      current = current.cdr
+      nr_current = nr_current.cdr
+      i += 1
     end
+    new_rail.last = nr_current
+    new_rail.length = length
+    new_rail
   end
   
   def each(&block)
-    if !empty?
-      block.call(element)
-      remaining.each(&block)
+    current = list
+    i = 0 
+    while i < length do
+      block.call(current.car)
+      current = current.cdr
+      i += 1
     end
   end
-  
-  def zip(other_rail)
-    if empty?
-      Rail.new
-    else
-      e = Rail.new(element, other_rail.element)
-      remaining.zip(other_rail.remaining).prep(e)
-    end
-  end
-  
+
   def down
     map { |e| 
       raise_error(self, 
         "structure expected; #{self.to_s} given") if !e.handle?
-      e.down
+      e.quoted
     } 
   end
+  
+  def all_up
+    new_rail = Rail.new
 
-  def length
-    return 0 if empty?
-    return remaining.length + 1
+    current = list
+    nr_current = new_rail.list
+    i = 0
+    while i < length
+      nr_current.car = Handle.new(current.car)
+      nr_current.cdr = Pair.new(nil, nil) 
+      current = current.cdr
+      nr_current = nr_current.cdr
+      i += 1
+    end
+    new_rail.last = nr_current
+    new_rail.length = length
+    new_rail
+  end
+  
+  def all_up_up
+    new_rail = Rail.new
+
+    current = list
+    nr_current = new_rail.list
+    i = 0
+    while i < length 
+      nr_current.car = Handle.new(Handle.new(current.car))
+      nr_current.cdr = Pair.new(nil, nil) 
+      current = current.cdr
+      nr_current = nr_current.cdr
+      i += 1
+    end
+    new_rail.last = nr_current
+    new_rail.length = length
+    new_rail
+  end
+  
+  def all_normal?
+    current = list
+    i = 0
+    while i < length
+      return false unless Handle.new(current.car).normal?
+      current = current.cdr
+      i += 1
+    end
+    
+    return true
   end
 
   def nth(n)
-    raise_error(self, "NTH: index is out of bound") if empty?
+    raise_error(self, "NTH: index is out of bound") if n > length || n < 1
     
-    if n == 1
-      element
-    elsif n > 1
-      remaining.nth(n-1)
-    else # n < 0
-      raise_error(self, "NTH: index is out of bound")
+    current = list
+    i = 1
+    while i < n
+      current = current.cdr
+      i += 1
     end
+    current.car
   end
  
   def first
@@ -128,12 +190,21 @@ public
   end
   
   def tail(n)
-    if n == 0  
+    if n > 0 && n <= length 
+      new_rail = Rail.new
+      current = list
+      i = 0
+      while i < n do
+        current = current.cdr
+        i += 1
+      end
+      new_rail.list = current
+      new_rail.length = length - n
+      new_rail.last = last
+      return new_rail
+    elsif n == 0  
       return self
-    elsif n > 0 
-      raise_error(self, "TAIL: index is out of bound") if empty?
-      return remaining.tail(n-1)
-    else # n < 0
+    else
       raise_error(self, "TAIL: index is out of bound")
     end
   end
@@ -143,58 +214,66 @@ public
   end
 
   def rplacn(n, e)
-    raise_error(self, "RPLACN: index is out of bound") if empty?
+    raise_error(self, "RPLACN: index is out of bound") if n < 1 || n > length
 
-    if n == 1
-      self.element = e
-      return Handle.new(:OK)
-    elsif n > 1
-      remaining.rplacn(n-1, e)
-    else  # n < 1
-      raise_error(self, "RPLACN: index is out of bound")
+    current = list
+    i = 1
+    while i < n
+      current = current.cdr
+      i += 1
     end
+    current.car = e
+    
+    return Handle.new(:OK)
   end
 
+=begin # rplact is banded after all!
   def rplact(n, t)
     raise_error(self, "RPLACT: index is out of bound") if n < 0 || n > length
     
-    if n == 0
-      self.element = t.element
-      self.remaining = t.remaining
-      return self
-    else
-      tail(n-1).remaining = t # returned
+    current = list
+    i = 0
+    while i < n 
+      current = current.cdr
+      i += 1
     end
+    current.car = t.list.car
+    current.cdr = t.list.cdr
+    self.last = t.last
+    self.length = n + t.length
+    
+    return Handle.new(:OK)
   end
+=end
 
   def append!(e)
-    t = tail(length)
-    t.element = e
-    t.remaining = Rail.new
+    last.car = e
+    last.cdr = Pair.new(nil, nil)
+    self.last = last.cdr
+    self.length += 1
     return self
   end
   
-  def join(r)
-    t = tail(length-1)
-    t.remaining = r
+  def join!(r)
+    raise_error(self, "Rail.join!: joining is permitted only on a terminating rail") if !last.car.nil?
+    last.car = r.list.car
+    last.cdr = r.list.cdr
+    self.last = r.last
+    self.length += r.length  
     self
   end
 
   def push(e)
-    r = remaining
-    old_top = element
-    self.element = e
-    self.remaining = Rail.new
-    self.remaining.element = old_top
-    self.remaining.remaining = r
+    self.list = Pair.new(e, list)
+    self.length += 1
     return self
   end
   
   def pop
     raise_error(self, "POP: attempt to pop from empty rail") if empty?
-    old_top = element
-    self.element = remaining.element
-    self.remaining = remaining.remaining
+    old_top = list.car
+    self.list = list.cdr
+    self.length -= 1
     return old_top
   end
 end

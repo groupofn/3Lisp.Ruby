@@ -23,7 +23,7 @@ class Environment
   def bound_atoms
     return Rail.new if empty?
     return Rail.new(*local.keys.map(&:up)) if tail.empty?
-    return Rail.new(*local.keys.map(&:up)).join(tail.bound_atoms)
+    return Rail.new(*local.keys.map(&:up)).join!(tail.bound_atoms)
   end
   
   def var_is_bound?(var)
@@ -62,90 +62,99 @@ protected
 
 public
   def bind_pattern(pattern, args)
-    new_bindings = bind_pattern_helper({}, pattern, args)
+    new_bindings = bind_pattern_helper({}, pattern, args, 0, 0)
     Environment.new(new_bindings, self)	
   end
 protected
   # generate new bindings from nested pattern and args
   # see diss.p.411 & diss.p.559
-  def bind_pattern_helper(newbindings, pattern, args)
+  def bind_pattern_helper(newbindings, pattern, args, p_quote_level, a_quote_level)
+=begin # cleaner but slower by 50% due to ups and downs
     if pattern.atom_d?
-      newbindings[pattern.down] = args.down
+      newbindings[pattern.quoted] = args.quoted
     else
-=begin slower version -- using map 
-      pattern = pattern.down.map(&:up) if pattern.rail_d?
+      pattern = pattern.quoted.all_up if pattern.rail_d?
+      
       if args.handle?
         if args.rail_d?
-          args = args.down.map(&:up) 
-        elsif args.down.rail_d?
-          args = args.down.down.map{|element| element.up.up}
+          args = args.quoted.all_up 
+        elsif args.quoted.rail_d?
+          args = args.quoted.quoted.all_up_up
         end
       end
-      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
-      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
+
+      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.rail?
+      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.rail?
 
       al = args.length; pl = pattern.length
       raise_error(self, "too many arguments") if al > pl
       raise_error(self, "too few arguments") if al < pl
 
-      for i in 1..al
-        bind_pattern_helper(newbindings, pattern.nth(i), args.nth(i))
-      end
-=end
-
-# BEGIN faster version -- avoiding map 
-      if pattern.rail_d?
-        pattern = pattern.down
-        root = nr = Rail.new
-        while !pattern.empty?
-          nr.element = pattern.element.up
-          nr.remaining = Rail.new
-          nr = nr.remaining
-          pattern = pattern.remaining
-        end
-        pattern = root
-      end
-
-      if args.handle?
-        if args.rail_d?
-          args = args.down
-          root = nr = Rail.new
-          while !args.empty?
-            nr.element = args.element.up
-            nr.remaining = Rail.new 
-            nr = nr.remaining
-            args = args.remaining
-          end
-          args = root
-        elsif args.down.rail_d?
-          args = args.down.down
-          root = nr = Rail.new
-          while !args.empty?
-            nr.element = args.element.up.up
-            nr.remaining = Rail.new 
-            nr = nr.remaining
-            args = args.remaining
-          end
-          args = root
-        end
-      end
-
-      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.sequence_d?
-      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.sequence_d?
-
-      al = args.length; pl = pattern.length
-      raise_error(self, "too many arguments") if al > pl
-      raise_error(self, "too few arguments") if al < pl
-
-      while !args.empty?
-        bind_pattern_helper(newbindings, pattern.element, args.element)
-        args = args.remaining; pattern = pattern.remaining
+      pc = pattern.list
+      ac = args.list
+      i = 0
+      while i < al do
+        bind_pattern_helper(newbindings, pc.car, ac.car)
+        pc = pc.cdr; ac = ac.cdr
+        i += 1
       end
     end 
-# END faster version
+=end
+
+
+#=begin # faster by avoiding ups and downs (esp. ups which creates new structure)
+    if pattern.atom?
+      raise_error(self, "atom is expected") if p_quote_level != 1
+      i = 1 # stripping one level
+      while i < a_quote_level
+        args = Handle.new(args)
+        i += 1
+      end
+      newbindings[pattern] = args
+    elsif pattern.atom_d?
+      raise_error(self, "atom is expected") if p_quote_level != 0
+      i = 0
+      while i < a_quote_level
+        args = Handle.new(args)
+        i += 1
+      end
+      newbindings[pattern.quoted] = args.quoted
+    else
+      if pattern.rail_d?
+        p_quote_level += 1
+        pattern = pattern.quoted
+      end
+  
+      if args.rail_d?
+        a_quote_level += 1
+        args = args.quoted
+      elsif args.handle? && args.quoted.rail_d?
+        a_quote_level += 2
+        args = args.quoted.quoted
+      end
+  
+      raise_error(self, "Pattern Matching: arguments ill-formed") if !args.rail?
+      raise_error(self, "Pattern Matching: pattern ill-formed") if !pattern.rail?
+
+      al = args.length; pl = pattern.length
+      raise_error(self, "too many arguments") if al > pl
+      raise_error(self, "too few arguments") if al < pl
+
+      pc = pattern.list
+      ac = args.list
+      i = 0
+      while i < al do
+        bind_pattern_helper(newbindings, pc.car, ac.car, p_quote_level, a_quote_level)
+        pc = pc.cdr; ac = ac.cdr
+        i += 1
+      end
+    end 
+#=end
 
     newbindings
-  end
+end
+
+
 
 public
   # pretty print 

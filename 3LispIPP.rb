@@ -24,7 +24,7 @@ class ThreeLispIPP
 
   def initialize
     self.stopwatch = Stopwatch.new
-#    stopwatch.mute # comment this line out to turn on time reporting
+    stopwatch.mute # comment this line out to turn on time reporting
     stopwatch.start
     
     self.reader = ExpReader.new
@@ -369,9 +369,9 @@ class ThreeLispIPP
         end
       end
     
-    rescue RuntimeError, ZeroDivisionError => detail
-      print "3-Lisp run-time error: " + detail.message + "\n" 
-      retry
+#    rescue RuntimeError, ZeroDivisionError => detail
+#      print "3-Lisp run-time error: " + detail.message + "\n" 
+#      retry
     rescue Errno::ENOENT, Errno::EACCES => detail
       print "3-Lisp IO error: " + detail.message + "\n"
       retry 

@@ -89,8 +89,8 @@
 (empty (scons))             ; => $T
 (empty (rcons))             ; => $T
 (let [[x (rcons '1)]]
-  (block (replace (tail 1 x) x)
-         (empty x)))        ; => $F
+  (block (replace (tail 1 x) x) 
+         (empty x)))        ; Error   ; Manual: => $F   
 (empty '(a. b))             ; Error
 
 (unit '[a])                 ; => $T
@@ -103,7 +103,7 @@
 (LET [[X (SCONS 10 20)]] 
   (BLOCK 
     (REPLACE (FOOT ↑X) '[30 40])
-    X))                     ; => [10 20 30 40]
+    X))                     ; Error  ; Manual: => [10 20 30 40]
 
 (rest [ 1 2 3])             ; => [2 3]
 (rest 1)                    ; Error
@@ -190,6 +190,9 @@
 (index [10] [1 $T [10]])      ; => 3
 (index '+ [])                 ; => 0
 
+
+;;; No longer available
+
 (set s [])
 (push 1 s)
 (push 2 s)
@@ -202,6 +205,9 @@ s                             ; => [2 1]
 s                             ; => [2 1]
 (pop s)                       ; => 2
 s                             ; => [1]
+
+;;; No longer available
+
 
 (ccons 'x '[] 'y 'z)              ; => '{Closure: X [] Y Z}
 (ccons 'simple ↑global '[x] 'x)   ; => '{Closure: SiMPLE #<Environment:#####> [x] x}
@@ -658,13 +664,13 @@ x                                   ; => '[ONE ** THREE]
 y                                   ; => '[** THREE]
 
 ; test cases for RPLACT
-(set x '[one two three])
-(set y (rest x))
-(set z (rest y))
-(rplact 1 x '[end])
-x                                   ; => '[ONE END]
-y                                   ; => '[END]
-z                                   ; => '[THREE]
+;(set x '[one two three])
+;(set y (rest x))
+;(set z (rest y))
+;(rplact 1 x '[end])
+;x                                   ; => '[ONE END]
+;y                                   ; => '[END]
+;z                                   ; => '[THREE]
 
 
 ; atom replacement not supported, because absorbed to Ruby's symbol ...
@@ -1215,7 +1221,7 @@ b  ; => 10
   (normalise `(id (replace ,↑↑dummy-id ↑uup)) global dummy-id))     ; => '''OK
 
 ((lambda simple [dummy-id]
-   (normalise `(id (replace ,↑↑dummy-id ↑uup)) global dummy-id))
+   (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))
  (lambda simple [x] (print ↑x)))
 
 
@@ -1321,7 +1327,7 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 
 (replace (foot ↑global) '[hal])  ; This no longer applies.
 
-; 11.Circular rails can cause NORMALISE to hang - even normal-form ones.
+; 11.Circular rails can cause NORMALISE to hang - even normal-form ones.  ; can no longer generate circular rail
 
 (set x (rcons '1))
 (block (replace (foot x) x) 'done)

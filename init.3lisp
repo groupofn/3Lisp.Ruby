@@ -382,11 +382,13 @@
         ((vector-constructor vector))
         (prep (1st vector) (copy-vector (rest vector))))))
         
-(define CONCATENATE
-  (lambda simple [rail1 rail2]
-    (block
-      (replace (foot rail1) rail2) ; this follows page 40, rather than the code given
-      rail1)))   
+; CONCATENATE now a primitive based on join! of Rail.
+;
+;(define CONCATENATE
+;  (lambda simple [rail1 rail2]
+;    (block
+;      (replace (foot rail1) rail2) ; this follows page 40, rather than the code given
+;      rail1)))   
 
 (define APPEND
   (lambda simple [vector1 vector2]
@@ -545,13 +547,17 @@
 
 (define QUOTE (lambda reflect [[a] e c] (c ↑a)))
 
-(define RPLACT 
-  (lambda simple [n rail new-tail]
-    (replace (tail n rail) new-tail)))
-    
-(define RPLACN
-  (lambda simple [n rail new-element]
-    (replace (tail (- n 1) rail) (prep new-element (tail n rail)))))
+; now banned
+;
+;(define RPLACT 
+;  (lambda simple [n rail new-tail]
+;    (replace (tail n rail) new-tail)))
+ 
+; now a primitive 
+;
+;(define RPLACN
+;  (lambda simple [n rail new-element]
+;    (replace (tail (- n 1) rail) (prep new-element (tail n rail)))))
     
 (define RPLACA
   (lambda simple [pair new-car]

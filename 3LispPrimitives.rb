@@ -142,10 +142,11 @@ class ThreeLispPrimitives
       [:REPLACE, :SIMPLE, Rail.new(:struc1, :struc2), lambda{|args|
         s1_rt = args.first.ref_type; s2_rt = args.second.ref_type
         raise_error(self, "REPLACE expects structures of the same type") if s1_rt != s2_rt
-        raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
+        raise_error(self, "REPLACE expects a pair or closure but was given #{s1_rt}") if ![:PAIR, :CLOSURE].include?(s1_rt)
+#        raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
         case s1_rt
-        when :RAIL
-          args.first.rplact(0, args.second.tail(0))
+#        when :RAIL
+#          args.first.rplact(0, args.second)
         when :PAIR
           args.first.rplaca(args.second.car)
           args.first.rplacd(args.second.cdr)
@@ -202,7 +203,15 @@ class ThreeLispPrimitives
         raise_error(self, "PREP expects a vector but was given #{args.second.to_s}") if !args.second.rail? && !args.second.rail_d?
         raise_error(self, "PREP expects a structure but was given #{args.first.to_s}") if args.second.rail_d? && !args.first.handle?
         args.second.prep(args.first) }], 
-      
+      [:CONCATENATE, :SIMPLE, Rail.new(:rail1, :rail2), lambda{|args|
+        raise_error(self, "CONCATENATE expects a rail but was given #{args.first.to_s}") if !args.first.rail_d? 
+        raise_error(self, "CONCATENATE expects a rail but was given #{args.second.to_s}") if !args.second.rail_d? 
+        args.first.join!(args.second) }],
+      [:RPLACN, :SIMPLE, Rail.new(:n, :rail, :"new-element"), lambda{|args|
+        raise_error(self, "RPLACN expects a rail but was given #{args.second.to_s}") if !args.second.rail_d? 
+        raise_error(self, "RPLACN expects a number but was given #{args.first.to_s}") if !args.first.numeral? 
+        raise_error(self, "RPLACN expects a structure but was given #{args.third.to_s}") if !args.third.handle? 
+        args.second.rplacn(args.first, args.third) }],
   
       [:PCONS, :SIMPLE, Rail.new([:car, :cdr]), lambda{|args| 
         raise_error(self, "PCONS expects structure but was given #{args.first.to_s}") if !args.first.handle?

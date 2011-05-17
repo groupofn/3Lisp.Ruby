@@ -99,15 +99,15 @@ class Object
   end
 
   def atom_d? # atom designator?
-    handle? && quoted.atom?
+    self.class == Handle && quoted.class == Symbol
   end
 
   def string_d?
-    handle? && quoted.string?
+    self.class == Handle && quoted.class == String
   end
   
   def pair_d? # pair designator?
-    handle? && quoted.pair? # ref_type == :PAIR
+    self.class == Handle && quoted.class == Pair # ref_type == :PAIR
   end
  
   def sequence_d? # sequence designator?
@@ -115,42 +115,26 @@ class Object
   end
 
   def rail_d? # rail designator?
-    handle? && quoted.rail?
+    self.class == Handle && quoted.class == Rail
   end
 
   def handle_d? # handle designator?
-    handle? && quoted.handle?
+    self.class == Handle && quoted.class == Handle
   end
 
   def closure_d? # closure designator?
-    handle? && quoted.closure?
+    self.class == Handle && quoted.class == Closure
   end
 
   def environment_d? # environment designator?
-    handle? && quoted.environment?
+    self.class == Handle && quoted.class == Environment
   end
 
   def normal?
     raise_error(self, "#{self.to_s} is not a 3Lisp structure") if !handle?
 
     return false if atom_d? || pair_d?
-
-  	if rail_d?
-
-# alternative 1: leading to infinite loop on circular structure 
-      r = self.quoted
-      while !r.empty?
-        return false unless r.first.up.normal?
-        r = r.rest
-      end
-      return true
-      
-=begin # alternative 2: leading to SystemStackError on circular structure 
-	    quoted.each {|item| return false unless item.up.normal? }
-	    return true
-=end
-	  end 
-
+  	return quoted.all_normal? if rail_d?
     return true # i.e. [:NUMERAL, :BOOLEAN, :HANDLE, :CLOSURE, :STRING :ENVIRONMENT].include?(ref_type)
   end
  
@@ -170,19 +154,7 @@ class Object
       return quoted.eq?(other.quoted) if quoted.handle? # recursive call
       return quoted.equal?(other.quoted)
     when :RAIL
-	    return false if other.struc_type != :RAIL
-      return false if length != other.length
-# BEGIN slower version -- using zip & each
-#      zip(other).each{|dbl| return false if !dbl.first.eq?(dbl.second) }
-# END slower version
-# BEGIN faster version -- avoiding zip & each
-      s = self; o = other
-      while !o.empty?
-        return false if !s.element.eq?(o.element);
-        s = s.remaining; o = o.remaining 
-      end
-# END faster version
-      return true
+      return eq?(other)
     else
       raise_error(self, "equality undefined for #{self.to_s} and #{other.to_s}")
     end

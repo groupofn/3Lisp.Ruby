@@ -33,19 +33,19 @@ class Handle
 
 # BEGIN Pair
   def car
-    quoted.car.up
+    Handle.new(quoted.car)
   end
   
   def cdr
-    quoted.cdr.up
+    Handle.new(quoted.cdr)
   end
 
   def rplaca(new_car)
-    quoted.rplaca(new_car.down).up
+    Handle.new(quoted.rplaca(new_car.quoted))
   end
 
   def rplacd(new_cdr)
-    quoted.rplacd(new_cdr.down).up
+    Handle.new(quoted.rplacd(new_cdr.quoted))
   end
 # END Pair
 
@@ -59,7 +59,7 @@ class Handle
   end
 
   def nth(n)
-    quoted.nth(n).up
+    Handle.new(quoted.nth(n))
   end
 
   def first
@@ -79,7 +79,7 @@ class Handle
   end
   
   def tail(n)
-    quoted.tail(n).up
+    Handle.new(quoted.tail(n))
   end
 
   def rest
@@ -87,23 +87,31 @@ class Handle
   end
 
   def prep(e)
-    quoted.prep(e.down).up
+    Handle.new(quoted.prep(e.quoted))
   end  
  
   # side effect: should alter self instead of returning new struct
   def rplacn(n, e)
-    quoted.rplacn(n, e.down).up
+    quoted.rplacn(n, e.quoted)
+    Handle.new(:OK)
   end
 
-  # side effect: should alter self instead of returning new struct
-  def rplact(n, t)
-    quoted.rplact(n, t.down).up
+  def join!(other)
+    quoted.join!(other.quoted)
+    self
   end
+  
+# banned now
+#  # side effect: should alter self instead of returning new struct
+#  def rplact(n, t)
+#    Handle.new(quoted.rplact(n, t.quoted))
+#  end
+
 # END Rail
   
 # BEGIN Closure
   def rplacc(c)
-    quoted.replace(c.quoted).up 
+    Handle.new(quoted.replace(c.quoted)) 
   end
 # END Closure
 
