@@ -1,5 +1,16 @@
 # encoding: UTF-8
 
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
 class Handle  
   attr_accessor :quoted
 
@@ -12,7 +23,7 @@ class Handle
   end
 
   def eql?(other) # used by hash
-    other.is_a?(Handle) && @quoted == other.quoted
+    other.instance_of?(Handle) && @quoted == other.quoted
   end
 
   def ==(other) # used by Array.include?
@@ -90,7 +101,6 @@ class Handle
     Handle.new(quoted.prep(e.quoted))
   end  
  
-  # side effect: should alter self instead of returning new struct
   def rplacn(n, e)
     quoted.rplacn(n, e.quoted)
     Handle.new(:OK)
@@ -100,13 +110,6 @@ class Handle
     quoted.join!(other.quoted)
     self
   end
-  
-# banned now
-#  # side effect: should alter self instead of returning new struct
-#  def rplact(n, t)
-#    Handle.new(quoted.rplact(n, t.quoted))
-#  end
-
 # END Rail
   
 # BEGIN Closure

@@ -1,6 +1,18 @@
 # encoding: UTF-8
 
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
 require './3LispError.rb'
+require './3LispRubyBasics.rb'
 
 class Environment
   include ThreeLispError
@@ -34,14 +46,9 @@ class Environment
 
   def binding(var)
     result = local[var]
-
-    if !result.nil?
-      result
-    elsif !tail.empty?
-      tail.binding(var)
-    else
-      raise_error(self, "#{var.to_s} is not bound")
-    end
+    return result if !result.nil?
+    raise_error(self, "#{var.to_s} is not bound") if tail.empty?
+    return tail.binding(var)
   end
   
   def rebind_one(var, arg)
@@ -62,99 +69,62 @@ protected
 
 public
   def bind_pattern(pattern, args)
-    new_bindings = bind_pattern_helper({}, pattern, args, 0, 0)
-    Environment.new(new_bindings, self)	
+    if pattern.atom_d?
+      raise_error(self, "Pattern Matching: structure expected for the argument") if !args.handle?
+      Environment.new({pattern.quoted => args.quoted}, self)	
+    else  
+      new_bindings = bind_pattern_helper({}, pattern, args, 0, 0)
+      Environment.new(new_bindings, self)
+    end
   end
 protected
   # generate new bindings from nested pattern and args
   # see diss.p.411 & diss.p.559
   def bind_pattern_helper(newbindings, pattern, args, p_quote_level, a_quote_level)
-=begin # cleaner but slower by 50% due to ups and downs
-    if pattern.atom_d?
-      newbindings[pattern.quoted] = args.quoted
-    else
-      pattern = pattern.quoted.all_up if pattern.rail_d?
-      
-      if args.handle?
-        if args.rail_d?
-          args = args.quoted.all_up 
-        elsif args.quoted.rail_d?
-          args = args.quoted.quoted.all_up_up
+    if pattern.rail_d?
+      p_quote_level += 1
+      pattern = pattern.quoted
+    end
+  
+    if args.rail_d?
+      a_quote_level += 1
+      args = args.quoted
+    elsif args.handle? && args.quoted.rail_d?
+      a_quote_level += 2
+      args = args.quoted.quoted
+    end
+  
+    raise_error(self, "Pattern Matching: pattern ill-formed") if !pattern.rail? 
+    raise_error(self, "Pattern Matching: arguments ill-formed") if !args.rail?
+
+    al = args.length; pl = pattern.length
+    raise_error(self, "Pattern Matching: too many arguments") if al > pl
+    raise_error(self, "Pattern Matching: too few arguments") if al < pl
+
+    # accessing innards of Rail directly; this breaches modularity for performance
+    pc = pattern.list
+    ac = args.list
+    i = 0
+    while i < al do
+      p_e = pc.car; a_e = ac.car
+      if p_e.atom?
+        raise_error(self, "Pattern Matching: atom is expected") if p_quote_level != 1
+        k = 1 # strip one level
+        while k < a_quote_level
+          a_e = Handle.new(a_e)
+          k += 1
         end
+        newbindings[p_e] = a_e
+      else
+        bind_pattern_helper(newbindings, p_e, a_e, p_quote_level, a_quote_level)
       end
 
-      raise_error(self, "sequence is expected for arguments but was given #{args.to_s}") if !args.rail?
-      raise_error(self, "sequence is expected as argument pattern but was given #{pattern.to_s}") if !pattern.rail?
-
-      al = args.length; pl = pattern.length
-      raise_error(self, "too many arguments") if al > pl
-      raise_error(self, "too few arguments") if al < pl
-
-      pc = pattern.list
-      ac = args.list
-      i = 0
-      while i < al do
-        bind_pattern_helper(newbindings, pc.car, ac.car)
-        pc = pc.cdr; ac = ac.cdr
-        i += 1
-      end
-    end 
-=end
-
-
-#=begin # faster by avoiding ups and downs (esp. ups which creates new structure)
-    if pattern.atom?
-      raise_error(self, "atom is expected") if p_quote_level != 1
-      i = 1 # stripping one level
-      while i < a_quote_level
-        args = Handle.new(args)
-        i += 1
-      end
-      newbindings[pattern] = args
-    elsif pattern.atom_d?
-      raise_error(self, "atom is expected") if p_quote_level != 0
-      i = 0
-      while i < a_quote_level
-        args = Handle.new(args)
-        i += 1
-      end
-      newbindings[pattern.quoted] = args.quoted
-    else
-      if pattern.rail_d?
-        p_quote_level += 1
-        pattern = pattern.quoted
-      end
-  
-      if args.rail_d?
-        a_quote_level += 1
-        args = args.quoted
-      elsif args.handle? && args.quoted.rail_d?
-        a_quote_level += 2
-        args = args.quoted.quoted
-      end
-  
-      raise_error(self, "Pattern Matching: arguments ill-formed") if !args.rail?
-      raise_error(self, "Pattern Matching: pattern ill-formed") if !pattern.rail?
-
-      al = args.length; pl = pattern.length
-      raise_error(self, "too many arguments") if al > pl
-      raise_error(self, "too few arguments") if al < pl
-
-      pc = pattern.list
-      ac = args.list
-      i = 0
-      while i < al do
-        bind_pattern_helper(newbindings, pc.car, ac.car, p_quote_level, a_quote_level)
-        pc = pc.cdr; ac = ac.cdr
-        i += 1
-      end
-    end 
-#=end
+      pc = pc.cdr; ac = ac.cdr
+      i += 1
+    end
 
     newbindings
-end
-
-
+  end
 
 public
   # pretty print 
@@ -171,9 +141,9 @@ protected
   # pretty print 
   # down to "levels" below the current level, which is the 0th
   def pp_helper(current, remaining, all_levels)
-    puts "\nEnvironment at level " + current.to_s + ":\n"
+    puts "\nEnvironment at level " << current.to_s << ":\n"
     leading_space = "  " * current
-    local.each_pair {|var, binding| puts leading_space + "#{var.to_s} => #{binding.to_s} \n" }
+    local.each_pair {|var, binding| puts leading_space << "#{var.to_s} => #{binding.to_s} \n" }
 
     if !tail.empty? && (all_levels || remaining > 0)
       tail.pp_helper(current + 1, remaining - 1, all_levels) 

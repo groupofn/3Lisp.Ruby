@@ -1,5 +1,17 @@
 # encoding: UTF-8
 
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
+require './3LispCharacters.rb'
 require './3LispError.rb'
 
 class ExpReader
@@ -32,7 +44,7 @@ class ExpReader
         c = c + STDIN.getc.chr 
       } 
       # wait just long enough for the escape sequence to get swallowed 
-      extra_thread.join(0.0001)
+      extra_thread.join(0.001)
       # kill thread so not-so-long escape sequences don't wait on getc 
       extra_thread.kill
     end
@@ -106,11 +118,11 @@ class ExpReader
   end
   
   def open_paren?(c)
-    c == "(" || c == "["
+    c == PAIR_START || c == RAIL_START
   end
 
   def close_paren?(c)
-    c == "]" || c == ")"
+    c == PAIR_END || c == RAIL_END
   end
 
   def pair_match?(c1, c2)
@@ -119,10 +131,10 @@ class ExpReader
 
   def paren_flip(c)
     case c
-    when "(" then ")"
-    when ")" then "("
-    when "[" then "]"
-    when "]" then "["
+    when PAIR_START then PAIR_END
+    when PAIR_END then PAIR_START
+    when RAIL_START then RAIL_END
+    when RAIL_END then RAIL_START
     end
   end
 

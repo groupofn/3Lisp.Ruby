@@ -1,6 +1,18 @@
 # encoding: UTF-8
 
-# This version allows shared tail, but forbids mutation of tail.
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
+# This version allows shared tail, but forbids its mutation tail, 
+# except for the special case of joining one to the end of another.
 
 require './3LispError.rb'
 require './3LispPair.rb'
@@ -12,25 +24,21 @@ class Rail
   attr_accessor :list, :length, :last
 
   def initialize(*args)
-    self.list = Pair.new(nil, nil)
     self.length = args.size
-    current = list
-    i = 0
-    while i < length
-      current.car = args[i]
-      current.cdr = Pair.new(nil, nil)
-      current = current.cdr
-      i += 1
+    self.list = self.last = Pair.new(nil, nil)    
+    i = length - 1
+    while i >= 0
+      self.list = Pair.new(args[i], list)
+      i -= 1
     end
-    self.last = current
   end
   
   def empty?
     length == 0
   end
 
-  def eq?(other)
-    return false if other.struc_type != :RAIL
+  def ==(other)
+    return false if !other.instance_of?(Rail)
     return false if length != other.length
     
     s = list; o = other.list
@@ -56,19 +64,6 @@ class Rail
     s << "]"
   end
   
-  def self.scons(args)
-    args.map{|element|       
-      element
-    }
-  end
-
-  def self.rcons(args)
-    Handle.new(args.map{|element| 
-      raise_error(self, "RCONS expects structure but was given #{element.to_s}") if !element.handle?     
-      element.quoted
-    })
-  end
-
   def prep(e)
     new_rail = Rail.new
     new_rail.list = Pair.new(e, list)
@@ -105,7 +100,20 @@ class Rail
     end
   end
 
-  def down
+  def self.scons(args)
+    args.map{|element|       
+      element
+    }
+  end
+
+  def self.rcons(args)
+    Handle.new(args.map{|element| 
+      raise_error(self, "RCONS expects structure but was given #{element.to_s}") if !element.handle?     
+      element.quoted
+    })
+  end
+
+  def all_down
     map { |e| 
       raise_error(self, 
         "structure expected; #{self.to_s} given") if !e.handle?
@@ -113,6 +121,8 @@ class Rail
     } 
   end
   
+  # could be defined with map, as "all_down" above
+  # defined specially for speed, because this one is used by bind_pattern_helper
   def all_up
     new_rail = Rail.new
 
@@ -131,6 +141,8 @@ class Rail
     new_rail
   end
   
+  # could be defined with map, as "all_down" above
+  # defined specially for speed, because this one is used by bind_pattern_helper
   def all_up_up
     new_rail = Rail.new
 
@@ -226,25 +238,6 @@ class Rail
     
     return Handle.new(:OK)
   end
-
-=begin # rplact is banded after all!
-  def rplact(n, t)
-    raise_error(self, "RPLACT: index is out of bound") if n < 0 || n > length
-    
-    current = list
-    i = 0
-    while i < n 
-      current = current.cdr
-      i += 1
-    end
-    current.car = t.list.car
-    current.cdr = t.list.cdr
-    self.last = t.last
-    self.length = n + t.length
-    
-    return Handle.new(:OK)
-  end
-=end
 
   def append!(e)
     last.car = e

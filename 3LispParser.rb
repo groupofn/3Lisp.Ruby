@@ -1,55 +1,21 @@
 # encoding: UTF-8
 
-require 'set'
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
+require './3LispCharacters'
 require './3LispClasses.rb'
 require './3LispError.rb'
 
-### Ruby constants for reserved characters ###
-
-# Spaces
-
-SPACE = " "
-TAB = "\t"
-NEWLINE = "\n"
-CARRIAGE_RETURN = "\r"
-SPACES = Set.new [SPACE, NEWLINE, CARRIAGE_RETURN, TAB]
-
-COMMENT_START = ";"
-SEPARATORS = SPACES + [COMMENT_START]
-
-# Special
-
-PAIR_START = "("
-PAIR_BREAK = "."
-PAIR_END = ")"
-RAIL_START = "["
-RAIL_END = "]"
-QUOTE = "'"
-BACKQUOTE = "`"
-COMMA = ","
-
-STRING_START = "\""
-STRING_END = "\""
-NAME_START = "$"
-
-UP = "↑"   # unicode 0x2191
-DOWN = "↓" # unicode 0x2193
-
-TRUE_NAME = "$T"
-FALSE_NAME = "$F"
-
-SPECIAL = Set.new [PAIR_START, PAIR_END, RAIL_START, RAIL_END, PAIR_BREAK, NAME_START, UP, DOWN, QUOTE, BACKQUOTE, COMMA, 
-           STRING_START, STRING_END]
-
-# Numeral
-
-PLUS = "+"
-MINUS = "-"
-
-SIGNS = Set.new [PLUS, MINUS]
-DIGITS = Set.new ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-
-class ThreeLispInternaliser
+class ThreeLispParser
   include ThreeLispError
   
   attr_accessor :source, :line, :column
@@ -73,26 +39,7 @@ class ThreeLispInternaliser
     end
   end
   
-  def separator?(ch)
-    ch == SPACE || ch == NEWLINE || ch == COMMENT_START || ch == CARRIAGE_RETURN || ch == TAB
-  end
-  
-  def special?(ch)
-    ch == PAIR_START || ch == PAIR_END || ch == RAIL_START || ch == RAIL_END || ch = PAIR_BREAK || ch == NAME_START ||
-    ch == UP || ch == DOWN || ch == QUOTE || ch == BACKQUOTE || ch == COMMA || ch == STRING_START || ch == STRING_END
-  end
-  
-  def sign?(ch)
-    ch == MINUS || ch == PLUS
-  end
-  
-  def digit?(ch)
-    ch == "0" || ch == "1" || ch == "2" || ch == "3" || ch == "4" ||
-    ch == "5" || ch == "6" || ch == "7" || ch == "8" || ch == "9"
-  end
-
   def skip_separators
-#    while !source.empty? && separator?(source[0]) 
     while !source.empty? && SEPARATORS.include?(source[0])
       @ch = source.slice!(0)
       if @ch == NEWLINE
@@ -107,7 +54,7 @@ class ThreeLispInternaliser
     end
   end
 
-  def internalise_string
+  def parse_string
     s = ""
     while !source.empty? && source[0] != STRING_END
       s << @ch = source.slice!(0)
@@ -123,11 +70,11 @@ class ThreeLispInternaliser
     return s
   end
 
-  def internalise_pair(bqlevel)
+  def parse_pair(bqlevel)
     skip_separators
     raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if source.empty?
  
-    car = internalise_exp(bqlevel)
+    car = parse_exp(bqlevel)
     skip_separators
     raise_error(self, "Line #{line} Column #{column}: expression expected", ThreeLispSyntaxError) if source.empty?
  
@@ -135,7 +82,7 @@ class ThreeLispInternaliser
       source.slice!(0)
       self.column += 1
       skip_separators
-      cdr = internalise_exp(bqlevel)
+      cdr = parse_exp(bqlevel)
       skip_separators
       if source.empty? || source[0] != PAIR_END
         raise_error(self, "Line #{line} Column #{column}: " << PAIR_END << " expected.", ThreeLispSyntaxError) 
@@ -143,13 +90,13 @@ class ThreeLispInternaliser
     elsif source[0] == PAIR_END
       cdr = Rail.new
     else
-      cdr = internalise_rail(bqlevel, PAIR_END)
+      cdr = parse_rail(bqlevel, PAIR_END)
     end
     source.slice!(0); self.column += 1  # absorb PAIR_END
     Pair.new(car, cdr)
   end
 
-  def internalise_rail(bqlevel, ending="")
+  def parse_rail(bqlevel, ending="")
     exps = Rail.new
     while !source.empty?
       skip_separators
@@ -165,30 +112,29 @@ class ThreeLispInternaliser
         end
         break
       else
-        exps.append!(internalise_exp(bqlevel))
+        exps.append!(parse_exp(bqlevel))
       end
     end
     exps 
   end
   
-  def internalise_exp(bqlevel)
+  def parse_exp(bqlevel)
     @ch = source.slice!(0); self.column += 1
     case @ch
     when PAIR_START
-      result = internalise_pair(bqlevel)
+      result = parse_pair(bqlevel)
     when RAIL_START
-      result = internalise_rail(bqlevel, RAIL_END)
+      result = parse_rail(bqlevel, RAIL_END)
     when QUOTE
-      result = Handle.new(internalise_exp(bqlevel))
+      result = Handle.new(parse_exp(bqlevel))
     when UP
-      result = Pair.new(:UP, Rail.new(internalise_exp(bqlevel)))
+      result = Pair.new(:UP, Rail.new(parse_exp(bqlevel)))
     when DOWN
-      result = Pair.new(:DOWN, Rail.new(internalise_exp(bqlevel)))    
+      result = Pair.new(:DOWN, Rail.new(parse_exp(bqlevel)))    
     when NAME_START
       n = "" << @ch
       
       while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])        
-#      while !source.empty? && !separator?(source[0]) && !special?(source[0])        
         n << source.slice!(0); self.column += 1 
       end
 
@@ -200,12 +146,12 @@ class ThreeLispInternaliser
         # this will be where other names are handled
       end
     when STRING_START
-      result = internalise_string
+      result = parse_string
     when COMMA
       raise_error(self, "Line #{line} Column #{column}: ',' has no matching '`'.", ThreeLispSyntaxError) if bqlevel < 1
-      result = CommaExpression.new(internalise_exp(bqlevel-1)) # no space between comma and what's comma-ed
+      result = CommaExpression.new(parse_exp(bqlevel-1)) # no space between comma and what's comma-ed
     when BACKQUOTE # no space between backquote and what's quoted
-      exp = internalise_exp(bqlevel+1)
+      exp = parse_exp(bqlevel+1)
       result = process_bq(exp)
     else # atom or numeral
       init_char = @ch
@@ -213,14 +159,11 @@ class ThreeLispInternaliser
       
       digits_only = true
       while !source.empty? && !SEPARATORS.include?(source[0]) && !SPECIAL.include?(source[0])
-#      while !source.empty? && !separator?(source[0]) && !special?(source[0])
          s << @ch = source.slice!(0); self.column += 1 
         digits_only = false if !DIGITS.include?(@ch)
-#        digits_only = false if !digit?(@ch)
       end
 
       if digits_only && (DIGITS.include?(init_char) || (SIGNS.include?(init_char) && s.length > 1))
-#      if digits_only && (digit?(init_char) || (sign?(init_char) && s.length > 1))
         result = s.to_i
       else 
         result = s.upcase.to_sym
@@ -247,7 +190,7 @@ class ThreeLispInternaliser
     self.column = 1
     self.source = source
     
-    internalise_rail(0)
+    parse_rail(0)
   end
 end
 
@@ -256,7 +199,7 @@ end
 
 =begin
 
-parser = ThreeLispInternaliser.new
+parser = ThreeLispParser.new
 parser.parse(IO.read("RPP.3lisp").to_s
 
 # or 

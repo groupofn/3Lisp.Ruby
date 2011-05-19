@@ -1,13 +1,20 @@
 # encoding: UTF-8
 
-# [ ] Further optimization is possible through 
-#     (1) less construction of IPP_ARGS, 
-#     (2) simplification of continuation construction, and
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
 
 require './3LispError.rb'
 require './3LispReader.rb'
 require './3LispClasses.rb'
-require './3LispInternaliser.rb'
+require './3LispParser.rb'
 require './3LispKernel.rb'
 require './3LispPrimitives.rb'
 require './stopwatch.rb'
@@ -18,17 +25,22 @@ INITIAL_REPLY_PROMPT = " = "
 class ThreeLispIPP
   include ThreeLispKernel
 
-  attr_accessor :reader, :parser, :global_env, :primitives, :reserved_names  # infrastructure of the IPP; note that part of the RPP state is in global_env
-  attr_accessor :cont_stack, :level, :cont, :env, :ipp_args, :ipp_proc, :read_prompt, :reply_prompt # state of the IPP
-  attr_accessor :stopwatch # utility
+  # infrastructure of the IPP; note that part of the RPP state is in global_env
+  attr_accessor :reader, :parser, :global_env, :primitives, :reserved_names  
 
+  # state of the IPP
+  attr_accessor :cont_stack, :level, :cont, :env, :ipp_args, :ipp_proc, :read_prompt, :reply_prompt
+
+  # utility
+  attr_accessor :stopwatch 
+  
   def initialize
     self.stopwatch = Stopwatch.new
     stopwatch.mute # comment this line out to turn on time reporting
     stopwatch.start
     
     self.reader = ExpReader.new
-    self.parser = ThreeLispInternaliser.new    
+    self.parser = ThreeLispParser.new    
     self.global_env = Environment.new({}, {})
     self.reserved_names = []
     
@@ -92,7 +104,7 @@ class ThreeLispIPP
 
     initial_defs = parser.parse(IO.read("init.3lisp"))
 
-    stopwatch.lap("Time spent on parsing initial defenitions: ")
+    stopwatch.lap("Time spent on parsing initial definitions: ")
     
     library_just_loaded = false
     $stdout = File.open("/dev/null", "w") # turn off STDOUT during normalization of initial definitions
@@ -349,12 +361,11 @@ class ThreeLispIPP
             end
     
       	    self.ipp_args = [prompt_and_read(read_prompt)]
+            stopwatch.start
           end
           self.cont = make_reply_continuation(String.new(read_prompt), String.new(reply_prompt), env)
           self.ipp_proc = :"NORMALISE"
-          
-          stopwatch.start
-    		
+              		
     	  when :"REPLY-CONTINUATION"			# result prompt
           result = ipp_args[0]
           f = ipp_args[1]
@@ -369,9 +380,9 @@ class ThreeLispIPP
         end
       end
     
-#    rescue RuntimeError, ZeroDivisionError => detail
-#      print "3-Lisp run-time error: " + detail.message + "\n" 
-#      retry
+    rescue RuntimeError, ZeroDivisionError => detail
+      print "3-Lisp run-time error: " + detail.message + "\n" 
+      retry
     rescue Errno::ENOENT, Errno::EACCES => detail
       print "3-Lisp IO error: " + detail.message + "\n"
       retry 
@@ -386,25 +397,3 @@ class ThreeLispIPP
   
 end
 
-
-# Stats from normalising (map + [1 2 3 4 5 6 7 8 9] [1 2 3 4 5 6 7 8 9])
-# 6,574	CALL
-# 5,345	NORMALISE
-# 2,987	NORMALISE-RAIL
-# 1,785	FIRST-CONTINUATION
-# 1,785	REST-CONTINUATION
-# 1,414	PROC-CONTINUATION
-# 1,414	REDUCE
-# 1,239	ARGS-CONTINUATION
-#  556	EXPAND-CLOSURE
-#  156	COND
-#  156	COND-CONTINUATION
-#   19	IF
-#   19	IF-CONTINUATION
-#    1	READ-NORMALISE-PRINT
-#    1	REPLY-CONTINUATION
-#    0	BLOCK-CONTINUATION
-#    0	LAMBDA
-
-
- 

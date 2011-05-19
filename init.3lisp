@@ -1,45 +1,29 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;                                  ;;;
+;;;   Ruby Implementation of 3Lisp   ;;;
+;;;                                  ;;;
+;;;          Version 1.00            ;;;
+;;;                                  ;;;
+;;;           2011-05-20             ;;;
+;;;           Group of N             ;;;
+;;;                                  ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
 ;;;
-;;;  This file is loaded as 3LispR launches.
+;;;  This file, called "init.3lisp", is loaded from the current working directory 
+;;;  as 3LispR launches.
 ;;;
 ;;;  You can add definitions of your own, following DEFINE below. 
 ;;;  These procedures will be available after 3LispR is launched.
 ;;;
-;;;  NOTE: Before including a new definition here, you might want to 
-;;;  test it first at the interactive prompt. This is because error 
-;;;  messages from parsing and processing this file are suppressed.
+;;;  NOTE: because error messages from parsing and processing this 
+;;;        file are suppressed, you might want to test a new definition 
+;;;        first at the interactive prompt, before including it in this
+;;;        file. 
 ;;;
 
-
-;; To be done: 
-
-; [x] clean up READ, PRINT, PROMPT&READ, PROMPT&REPLY, READ-NORMALISE-PRINT: it seems that levels and prompts should be differentiated, maybe then combined?
-; [x] ACONS
-; [x] do
-; [x] INTERNALISE and EXTERNALISE: provided primitively. note that the manual takes these to be non-primitive, which is OK 
-;                                  because the STRING type is not primitive, but rather sequence of characters. 
-; [-] I/O: NO support for streams for now. The Manual version has no CONS. It thus does not offer a useful, complete set.
-; [-] ?-ending of boolean functions ... not doing this so as to (i) conform to the manual & (ii) allow charactersitic functions for types
-; [x] REPLACE
-; => [x] REPLACE done for RAIL and PAIR
-; => [-] REPLACE not done for ATOM, because Ruby does not allow change of symbol, while retaining object identity. 
-; => [?] REPLACE could be trivially done for CLOSURE, but what's the point? 
-; [x] - + - * page 46 ...
-; [x] shared tail
-; [x] string
-
-;; To study:
-
-; [x] macro
-; - do
-; - slowness of let and possible fix
-; - select family
-; - let family
-; [x] catch/throw; delay/force
-; - Y-operator
-
-;; To think about
-; prompt&read ... do we need level number? I think NOT.
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -48,7 +32,11 @@
 ;;
 
 
-;;; DEFINE
+; DEFINE -- This makes DEFINE available in the global environment
+;           through using REBIND, which is a primitive. Because
+;           pretty much everything below uses DEFINE, this needs to 
+;           be the first in the init.3lisp
+
 (rebind 'define
   ↑(lambda reflect [[var def] env cont]
     (normalise def env 
@@ -57,57 +45,6 @@
           (rebind var def! global)
           (cont ↑var)))))
   global)
-
-(define MEMBER                                               
-  (lambda simple [element vector]
-    (cond [(empty vector) $F]
-          [(= element (1st vector)) $T]
-          [$T (member element (rest vector))])))
-
-
-
-
-(define version
-  (lambda simple [] "3Lisp version R01, April 28, 2011"))
-
-(define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
-;(define DOUBLE (lambda simple [vec] (and (not (empty vec)) (unit (rest vec))))) ; Manual version: slow on short vectors
-
-(define EXTERNAL    (lambda simple [x]
-                      (member (type x) 
-                              ['sequence 'number 'truth-value 'function
-                               'bindings])))
-
-(define VECTOR-CONSTRUCTOR
-  (lambda simple [template]
-    (if (external template) scons rcons)))
-
-;(define MAP
-;  (lambda simple args
-;    (if (empty (2nd args)) 
-;        ((vector-constructor (2nd args)))
-;        (if (double args)
-;            (prep ((1st args) (1st (2nd args)))
-;                  (map (1st args) (rest (2nd args))))
-;            (prep ((1st args) . (map 1st (rest args)))
-;                  (map . (prep (1st args) (map rest (rest args)))))))))
-
-(define MAP
-  (lambda simple args
-    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
-          [(double args)
-           (prep ((1st args) (1st (2nd args)))
-                 (map (1st args) (rest (2nd args))))]
-          [$T (prep ((1st args) . (map 1st (rest args)))
-                    (map . (prep (1st args) (map rest (rest args)))))])))
-
-
-; LAMBDA
-
-; SIMPLE 
-
-; REFLECT
-
 
 (define MACRO
   (lambda simple [def-env pattern body]
@@ -120,23 +57,45 @@
   (lambda macro [list body]
     `((lambda simple ,(map 1st list) ,body) . ,(map 2nd list))))
 
-(define 1sts
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;
+; These are general utilities used in the definition of 
+; the version of LET below.
+;
+
+(define 1STS
   (lambda simple [list]
     (cond
       [(empty list) ((vector-constructor list))]
       [$T (prep (1st (1st list)) (1sts (rest list)))])))
 
-(define 2nds
+(define 2NDS
   (lambda simple [list]
     (cond
       [(empty list) ((vector-constructor list))]
       [$T (prep (2nd (1st list)) (2nds (rest list)))])))
 
-(define LET                                                       ; performance of this version is 20% better than using MAP
+(define MEMBER                                               
+  (lambda simple [element vector]
+    (cond [(empty vector) $F]
+          [(= element (1st vector)) $T]
+          [$T (member element (rest vector))])))
+
+(define EXTERNAL (lambda simple [x]
+  (member (type x) 
+    ['sequence 'number 'truth-value 'function 'bindings])))
+
+(define VECTOR-CONSTRUCTOR
+  (lambda simple [template]
+    (if (external template) scons rcons)))
+;
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(define LET                                                       ; performance of this version is 20% better than the above version that uses MAP
   (lambda macro [list body]
     `((lambda simple ,(1sts list) ,body) . ,(2nds list))))
 
-;(define LET                                                      ; performance of this version is only slightly better.
+;(define LET                                                      ; performance of this version is only slightly better that the above version.
 ;  (lambda reflect [[list body] env cont]
 ;    (normalise (2nds list) env 
 ;      (lambda simple [args!]
@@ -156,6 +115,14 @@
           (block . ,(map (lambda simple [x] `(set . ,x)) list))
           ,body))
       . ,(map (lambda simple [x] ''?) list))))
+
+
+; LAMBDA -- provided as a kernel procedure
+
+; SIMPLE -- provided as a kernel procedure
+
+; REFLECT -- provided as a kernel procedure
+
 
 (define REFLECT!
   (lambda simple [def-env pattern body]
@@ -182,14 +149,15 @@
   (lambda simple [fun]
     (reflect (environment-designator ↑fun) (pattern ↑fun) (body ↑fun))))
 
-; DEFEIN
+; DEFEIN -- this demonstrates that DEFINE or DEFEIN can be defined.
 
 (define DEFEIN
   (lambda macro [label form]
     `(block (set ,label (y-OPERATOR (lambda simple [,label] ,form)))
             ,↑label)))
 
-;;; SET -- assignment
+; SET -- assignment
+
 (define SET
   (lambda reflect [[var exp] env cont]
     (normalise exp env
@@ -203,8 +171,6 @@
     (block (rebind ↓var! binding! env)
            (cont ''OK))))
 
-; REBIND is a primitive
-
 ;;
 ;; Naming and Procedure Definition
 ;;
@@ -216,15 +182,15 @@
 ;; Control Structure Utilities
 ;;
 
-; if
+; IF -- provided as a kernel procedure
+ 
+; COND -- provided as a kernel procedure
 
-; cond
+; COND-HELPER -- not needed in this implementation
 
-; cond-helper
+; BLOCK -- provided as a kernel procedure
 
-; block-helper
-
-; block
+; BLOCK-HELPER -- not needed in this implementation
 
 (define DO
   (lambda macro args
@@ -241,7 +207,6 @@
                                 `[[$T (block ,body
                                              (,loop-name . ,next))]])))]]
          (,loop-name . ,init)))))
-          
 
 (define SELECT
   (lambda macro args
@@ -269,6 +234,7 @@
       `(let [[,dummy ,(1st args)]]
           (cond . ,(map selectq-helper (rest args)))))))
         
+        
 (define CATCH
   (lambda reflect [[exp] env cont]
     (cont (normalise exp env id))))
@@ -277,7 +243,7 @@
   (lambda reflect! [[exp!] env cont] exp!))
   
 
-(define DELAY                                                ; Is this the right name?
+(define DELAY                                                ; JL: Is this the right name?
   (lambda macro [exp]
     `(lambda simple [] ,exp)))
 
@@ -297,8 +263,8 @@
 ;;
 
 
-;(define 1ST (lambda simple [vector] (nth 1 vector)))         ; KU
-;(define 2ND (lambda simple [vector] (nth 2 vector)))         ; KU
+;(define 1ST (lambda simple [vector] (nth 1 vector)))         ; a kernel utility
+;(define 2ND (lambda simple [vector] (nth 2 vector)))         ; a kernel utility
 (define 3RD (lambda simple [vector] (nth 3 vector)))
 (define 4TH (lambda simple [vector] (nth 4 vector)))
 (define 5TH (lambda simple [vector] (nth 5 vector)))
@@ -306,49 +272,22 @@
 
 (define LAST (lambda simple [vector] (nth (length vector) vector))) ; Not in manual
 
-;(define REST (lambda simple [vector] (tail 1 vector)))       ; KU
+;(define REST (lambda simple [vector] (tail 1 vector)))       ; a kernel utility
 
-(define foot (lambda simple [vector] (tail (length vector) vector)))
+(define FOOT (lambda simple [vector] (tail (length vector) vector)))
 
-;(define UNIT (lambda simple [vec] (= 1 (length vec))))       ; KU & different from manual
+;(define UNIT (lambda simple [vec] (= 1 (length vec))))       ; a kernel utility & different from manual
+
+(define DOUBLE (lambda simple [vec] (= 2 (length vec))))      ; different from manual
+
+; Manual version: slow on short vectors
+; (define DOUBLE (lambda simple [vec] (and (not (empty vec)) (unit (rest vec))))) 
 
 (define MEMBER                                               
   (lambda simple [element vector]
     (cond [(empty vector) $F]
           [(= element (1st vector)) $T]
           [$T (member element (rest vector))])))
-
-; isomorphic is primitive for now ...
-
-(define isomorphic
-  (lambda simple [e1 e2]
-    (cond [(not (= (type e1) (type e2))) $F]
-          [(= e1 e2) $T]
-          [(rail e1)
-           (or (and (empty e1) (empty e2))
-               (and (not (empty e1))
-                    (not (empty e2))
-                    (isomorphic (1st e1) (1st e2))
-                    (isomorphic (rest e1) (rest e2))))]
-          [(pair e1)
-           (and (isomorphic (car e1) (car e2))
-                (isomorphic (cdr e1) (cdr e2)))]
-          [(closure e1)
-           (and (isomorphic (procedure-type e1)
-                            (procedure-type e2))
-                (isomorphic (pattern e1) (pattern e2))
-                (isomorphic (body e1) (body e2))
-                (isomorphic (environment-designator e1)
-                            (environment-designator e2)))]
-          [(handle e1) (isomorphic ↓e1 ↓e2)]
-          [(environment e1) 
-           (do [[e1-atoms (bound-atoms e1) (rest e1-atoms)] 
-                [e2-atoms (bound-atoms e2) (rest e2-atoms)]]
-               [[(empty e1-atoms) $T] 
-                [(not (isomorphic (1st e1-atoms) (1st e2-atoms))) $F]
-                [(not (isomorphic (binding (1st e1-atoms) e1) (binding (1st e2-atoms) e2))) $F]])]
-          [$T $F])))
-
 
 (define INDEX
   (lambda simple [element vector]
@@ -367,14 +306,14 @@
   (lambda simple args
     (pcons (1st args) (rcons . (rest args)))))
 
-;(define MAP
-;  (lambda simple args
-;    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
-;          [(double args)
-;           (prep ((1st args) (1st (2nd args)))
-;                 (map (1st args) (rest (2nd args))))]
-;          [$T (prep ((1st args) . (map 1st (rest args)))
-;                    (map . (prep (1st args) (map rest (rest args)))))])))
+(define MAP
+  (lambda simple args
+    (cond [(empty (2nd args)) ((vector-constructor (2nd args)))]
+          [(double args)
+           (prep ((1st args) (1st (2nd args)))
+                 (map (1st args) (rest (2nd args))))]
+          [$T (prep ((1st args) . (map 1st (rest args)))
+                    (map . (prep (1st args) (map rest (rest args)))))])))
 
 (define COPY-VECTOR
   (lambda simple [vector]
@@ -411,21 +350,40 @@
     (lambda simple [vector]
       (rev vector ((vector-constructor vector))))))
 
-(define PUSH
-  (lambda simple [element stack]
-    (replace ↑stack
-             ↑(prep element
-                    (if (empty stack)
-                        (scons)
-                        (prep (1st stack) (rest stack)))))))
-                        
-(define POP
-  (lambda simple [stack]
-    (let [[top (1st stack)]]
-      (block
-        (replace ↑stack ↑(rest stack))
-        top))))
 
+; these are no longer available because REPLACE of rails is banneds
+;
+;(define PUSH
+;  (lambda simple [element stack]
+;    (replace ↑stack
+;             ↑(prep element
+;                    (if (empty stack)
+;                        (scons)
+;                        (prep (1st stack) (rest stack)))))))
+;                        
+;(define POP
+;  (lambda simple [stack]
+;   (let [[top (1st stack)]]
+;      (block
+;        (replace ↑stack ↑(rest stack))
+;        top))))
+
+; the following reflective versions work OK enough, i.e. assuming 
+; the second argumente is an atom 
+
+(define PUSH
+  (lambda reflect [[element stack] env cont]
+    (cont ↑(rebind stack ↑(prep ↓(normalise element env id) ↓(binding stack env)) env))))
+
+(define POP
+  (lambda reflect [[stack] env cont]
+    (let [[s ↓(binding stack env)]]
+      (if (empty s)
+          (error "Attempting to pop from an empty stack")
+          (let [[top (1st s)]]
+            (block
+              (rebind stack ↑(rest s) env)
+              (cont ↑top)))))))
 ;;
 ;; Vector Utilities
 ;;
@@ -501,15 +459,15 @@
 ;; General Utilities
 ;;
 
-;(define ATOM       (lambda simple [x] (= (type x) 'atom)))               ; KU
-;(define PAIR       (lambda simple [x] (= (type x) 'pair)))
+;(define ATOM       (lambda simple [x] (= (type x) 'atom)))               ; a kernel utility 
+;(define PAIR       (lambda simple [x] (= (type x) 'pair)))               ; a kernel utility
 
 (define HANDLE      (lambda simple [x] (= (type x) 'handle)))
 ;(define RAIL       (lambda simple [x] (= (type x) 'rail)))
 (define NUMERAL     (lambda simple [x] (= (type x) 'numeral)))
 (define BOOLEAN     (lambda simple [x] (= (type x) 'boolean)))
 (define CLOSURE     (lambda simple [x] (= (type x) 'closure)))
-(define ENVIRONMENT (lambda simple [x] (= (type x) 'environment)))        ; should use ? version to avoid conflict
+(define ENVIRONMENT (lambda simple [x] (= (type x) 'environment)))  
 (define STREAMER    (lambda simple [x] (= (type x) 'streamer)))
 
 (define SEQUENCE    (lambda simple [x] (= (type x) 'sequence)))
@@ -547,13 +505,45 @@
 
 (define QUOTE (lambda reflect [[a] e c] (c ↑a)))
 
-; now banned
+
+(define ISOMORPHIC
+  (lambda simple [e1 e2]
+    (cond [(not (= (type e1) (type e2))) $F]
+          [(= e1 e2) $T]
+          [(rail e1)
+           (or (and (empty e1) (empty e2))
+               (and (not (empty e1))
+                    (not (empty e2))
+                    (isomorphic (1st e1) (1st e2))
+                    (isomorphic (rest e1) (rest e2))))]
+          [(pair e1)
+           (and (isomorphic (car e1) (car e2))
+                (isomorphic (cdr e1) (cdr e2)))]
+          [(closure e1)
+           (and (isomorphic (procedure-type e1)
+                            (procedure-type e2))
+                (isomorphic (pattern e1) (pattern e2))
+                (isomorphic (body e1) (body e2))
+                (isomorphic (environment-designator e1)
+                            (environment-designator e2)))]
+          [(handle e1) (isomorphic ↓e1 ↓e2)]
+          [(environment e1) 
+           (do [[e1-atoms (bound-atoms e1) (rest e1-atoms)] 
+                [e2-atoms (bound-atoms e2) (rest e2-atoms)]]
+               [[(empty e1-atoms) $T] 
+                [(not (isomorphic (1st e1-atoms) (1st e2-atoms))) $F]
+                [(not (isomorphic (binding (1st e1-atoms) e1) (binding (1st e2-atoms) e2))) $F]])]
+          [$T $F])))
+
+
+
+; Replacing tail is now banned
 ;
 ;(define RPLACT 
 ;  (lambda simple [n rail new-tail]
 ;    (replace (tail n rail) new-tail)))
  
-; now a primitive 
+; RLACN is now a primitive 
 ;
 ;(define RPLACN
 ;  (lambda simple [n rail new-element]
@@ -612,18 +602,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Special Utilities  
+;; Special I/O and System Utilities  
 ;;
 
-
-(define println
+(define PRINTLN
   (lambda simple args 
     (block
       (print . args)
       (newline))))
 
-
-;; create the load and edit stuff as in the manual 
 
 (define edit
   (lambda simple args
@@ -648,7 +635,7 @@
     (cont (normalise-rail (parse (source . ↓args)) env id))))
 
 
-;(define pp ; pretty print draft ...
+;(define pp ; pretty print is still a piece of work in progress ...
 ;  (lambda simple [exp]
 ;    (select (type exp)
 ;      [['atom 'numeral 'boolean 'rail] (print exp)]
@@ -664,43 +651,60 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Expertimental stuff
-;;;
-; 
-;(define lambda
-;  (lambda reflect [[kind pattern body] env cont]
-;    (cont (!kind env pattern body))))
-;
-; or rather
-;
-;(define lambda
-;  (lambda reflect [[kind pattern body] env cont]
-;    (normalise kind env
-;      (lambda simple [kind!]
-;        (cont (↓kind! env pattern body))))))
-;   
-;(define simple
-;  (lambda simple [def-env pattern body]
-;    (ccons 'simple def-env pattern body)))
-;
-;(define reflect
-;  (lambda simple [def-env pattern body]
-;    (ccons 'reflect def-env pattern body)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A version of the RPP normalising arguments R-to-L 
+;;                  due to B.C.S.
+;;
+;; J.L. has found this one very useful in debugging
+;; and benchmarking.
+;;
 
-; 3Lisp Manual version
-;
-;(define lambda
-;  (lambda reflect [[kind pattern body] env cont]
-;    (reduce kind ↑[env pattern body] env cont)))
-;    
-;(define simple
-;  (lambda simple [def-env pattern body]
-;    ↓(ccons 'simple def-env pattern body)))
-;    
-;(define reflect
-;  (lambda simple [def-env pattern body]
-;    ↓(ccons 'reflect def-env pattern body)))
+(define normalise#
+  (lambda simple [exp env cont]
+    (cond [(normal exp) (cont exp)]
+          [(atom exp) (cont (binding exp env))]
+          [(rail exp) (normalise-rail# exp env cont)]
+          [(pair exp) (reduce# (car exp) (cdr exp) env cont)])))
+
+(define reduce#
+  (lambda simple [proc args env cont]
+    (normalise# proc env
+      (lambda simple [proc!]
+        (if (reflective proc!)
+            (↓(de-reflect proc!) args env cont)
+            (normalise# args env ; JL: changed "normalise" to "normalise#"
+              (lambda simple [args!]
+                (if (primitive proc!)
+                    (cont ↑(↓proc! . ↓args!))
+                    (normalise#
+                       (body proc!)
+                       (bind (pattern proc!) args! (environment-of proc!))
+                       cont)))))))))
+
+
+(define normalise-rail#
+  (lambda simple [rail env cont]
+     (if (empty rail)
+         (cont rail)
+         (normalise-rail# (rest rail) env
+            (lambda simple [rest!]
+               (normalise# (1st rail) env
+                  (lambda simple [first!]
+                     (cont (prep first! rest!)))))))))
+                     
+(define block#
+  (lambda reflect [clauses env cont]
+    (normalise-rail# clauses env 
+      (lambda simple [clauses!]
+        (cont (nth (length clauses!) clauses!))))))
+
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define VERSION
+  (lambda simple [] "3Lisp Ruby Implementation, Version 1.00, May 20, 2011"))
 
     
+;;; THE END ;;;

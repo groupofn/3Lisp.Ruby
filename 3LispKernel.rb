@@ -1,6 +1,15 @@
 # encoding: UTF-8
 
-require './3LispInternaliser.rb'
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
 
 module ThreeLispKernel
 
@@ -198,10 +207,10 @@ module ThreeLispKernel
     }
   end
   
-  def make_rpp_continuation(cont_name, args)
+  def make_cont(cont_name, args)
     template = PPC_TEMPLATES[cont_name]
     Closure.new(template[1].kind, 
-                template[1].environment.bind_pattern(template[0].up, args.up), 
+                template[1].environment.bind_pattern(Handle.new(template[0]), Handle.new(args)), 
                 template[1].pattern,
                 template[1].body,
                 template[1].system_type,
@@ -209,43 +218,35 @@ module ThreeLispKernel
   end  
 
   def make_reply_continuation(read_prompt, reply_prompt, env)
-    local_args = Rail.new(read_prompt, reply_prompt, env)
-    make_rpp_continuation(:"REPLY-CONTINUATION", local_args)
+    make_cont(:"REPLY-CONTINUATION", Rail.new(read_prompt, reply_prompt, env))
   end
     
   def make_proc_continuation(proc, args, env, cont)
-    local_args = Rail.new(proc, args, env, cont)
-    make_rpp_continuation(:"PROC-CONTINUATION", local_args)
+    make_cont(:"PROC-CONTINUATION", Rail.new(proc, args, env, cont))
   end
   
   def make_args_continuation(proc_bang, proc, args, env, cont)
-    local_args = Rail.new(proc_bang, proc, args, env, cont)
-    make_rpp_continuation(:"ARGS-CONTINUATION", local_args)
+    make_cont(:"ARGS-CONTINUATION", Rail.new(proc_bang, proc, args, env, cont))
   end
     
   def make_first_continuation(rail, env, cont)
-    local_args = Rail.new(rail, env, cont)
-    make_rpp_continuation(:"FIRST-CONTINUATION", local_args)
+    make_cont(:"FIRST-CONTINUATION", Rail.new(rail, env, cont))
   end
     
   def make_rest_continuation(first_bang, rail, env, cont)
-    local_args = Rail.new(first_bang, rail, env, cont)
-    make_rpp_continuation(:"REST-CONTINUATION", local_args)
+    make_cont(:"REST-CONTINUATION", Rail.new(first_bang, rail, env, cont))
   end
     
   def make_if_continuation(premise, c1, c2, env, cont)
-    local_args = Rail.new(premise, c1, c2, env, cont)
-    make_rpp_continuation(:"IF-CONTINUATION", local_args)
+    make_cont(:"IF-CONTINUATION", Rail.new(premise, c1, c2, env, cont))
   end
     
   def make_block_continuation(clauses, env, cont)
-    local_args = Rail.new(clauses, env, cont)
-    make_rpp_continuation(:"BLOCK-CONTINUATION", local_args)
+    make_cont(:"BLOCK-CONTINUATION", Rail.new(clauses, env, cont))
   end
     
   def make_cond_continuation(clauses, env, cont)
-    local_args = Rail.new(clauses, env, cont)
-    make_rpp_continuation(:"COND-CONTINUATION", local_args)
+    make_cont(:"COND-CONTINUATION", Rail.new(clauses, env, cont))
   end
 
   PPC_TEMPLATES = {}

@@ -349,4 +349,16 @@ a primitive.
 It seems to me that such a set up could provide some of the needed support if we decide to introduce proper names
 into 3.nLisp and treat the names of kernels and primitives as proper names.
 
+5. Rail
+
+6. Streams
+
+; [-] I/O: NO support for streams for now. The Manual version has no CONS. It thus does not offer a useful, complete set.
+
+
+7. ; [x] REPLACE
+; => [x] REPLACE done for RAIL and PAIR
+; => [-] REPLACE not done for ATOM, because Ruby does not allow change of symbol, while retaining object identity. 
+; => [?] REPLACE could be trivially done for CLOSURE, but what's the point? 
+
  

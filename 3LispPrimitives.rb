@@ -1,17 +1,22 @@
 # encoding: UTF-8
 
+####################################
+#                                  #
+#   Ruby Implementation of 3Lisp   #
+#                                  #
+#          Version 1.00            #
+#                                  #
+#           2011-05-20             #
+#           Group of N             #
+#                                  #
+####################################
+
 require './3LispClasses.rb'
 
 class ThreeLispPrimitives
 
-#  def initialize(reader, parser, global_env, reserved_names)
-#    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = reader, parser, global_env, reserved_names
-#    @ACONS_STRINGS = {}
-#  end
-
   def initialize(ipp)
     @IPP = ipp
-#    @READER, @PARSER, @GLOBAL_ENV, @RESERVED_NAMES = ipp.reader, ipp.parser, ipp.global_env, ipp.reserved_names
     @ACONS_STRINGS = {}
   end
 
@@ -121,7 +126,6 @@ class ThreeLispPrimitives
           print args.first.down.to_s
         end
         Handle.new(:OK)}],
-#      [:TERPRI, :SIMPLE, Rail.new, lambda{|args| print "\n"; Handle.new(:OK) }], # not needed any more
       [:INTERNALISE, :SIMPLE, Rail.new(:string), lambda{|args|
         parsed = parser.parse(args.first)
         raise_error(self, "Failed to internalise string: #{args.first}") if parsed.empty?
@@ -138,15 +142,11 @@ class ThreeLispPrimitives
         raise_error(self, "DOWN expects a normal-form structure but was given #{args.first.to_s}") if !args.first.normal?
         result = args.first.down
         return result }],
-# should REPLACE be made to work with Environment also?
       [:REPLACE, :SIMPLE, Rail.new(:struc1, :struc2), lambda{|args|
         s1_rt = args.first.ref_type; s2_rt = args.second.ref_type
         raise_error(self, "REPLACE expects structures of the same type") if s1_rt != s2_rt
         raise_error(self, "REPLACE expects a pair or closure but was given #{s1_rt}") if ![:PAIR, :CLOSURE].include?(s1_rt)
-#        raise_error(self, "REPLACE expects rail, pair, or closure but was given #{s1_rt}") if ![:RAIL, :PAIR, :CLOSURE].include?(s1_rt)
         case s1_rt
-#        when :RAIL
-#          args.first.rplact(0, args.second)
         when :PAIR
           args.first.rplaca(args.second.car)
           args.first.rplacd(args.second.cdr)
@@ -166,7 +166,6 @@ class ThreeLispPrimitives
             first = second
             rest = rest.rest
           else
-            raise_error(self, "= not generally defined over functions") if first.closure? && second.closure?
             return false
           end
         end  
@@ -181,7 +180,6 @@ class ThreeLispPrimitives
       }],
   
       [:SCONS, :SIMPLE, :args, lambda{|args| 
-        raise_error(self, "SCONS expects a sequence but was given #{args.to_s}") if !args.sequence_d?
         Rail.scons(args) }], 
       [:RCONS, :SIMPLE, :args, lambda{|args| 
         Rail.rcons(args) }], 
@@ -327,13 +325,11 @@ class ThreeLispPrimitives
         return Environment.new({}, {}) if args.empty? 
         return Environment.new({}, args.first) if args.first.environtment? 
         raise_error(self, "ECONS was given #{args.first} where it expects an environment") }],
-      # handles expected for the follwing three, thus no ".up"
       [:BINDING, :SIMPLE, Rail.new(:var, :env), lambda{|args| 
         raise_error(self, "BINDING expects an atom but was given #{args.first.to_s}") if !args.first.atom_d?
         raise_error(self, "BINDING expects an environment but was given #{args.second.to_s}") if !args.second.environment?
         args.second.binding(args.first.down).up }],
       [:BIND, :SIMPLE, Rail.new(:pat, :bindings, :env), lambda{|args|
-    #    raise_error(self, "BIND expects an pattern designator but was given #{args.first.to_s}") if !args.first.rail_d?
         raise_error(self, "BIND expects bindings to be in normal form but was given #{args.second.to_s}") if !args.second.normal?
         raise_error(self, "BIND expects an environment but was given #{args.third.to_s}") if !args.third.environment?
         args.third.bind_pattern(args.first, args.second) }],
@@ -351,7 +347,7 @@ class ThreeLispPrimitives
         args.second.var_is_bound?(args.first.down) }],
       [:"BOUND-ATOMS", :SIMPLE, Rail.new(:env), lambda{|args|
         raise_error(self, "BOUND expects an environment but was given #{args.first.to_s}") if !args.first.environment?
-        args.first.bound_atoms }], # returns a sequence of atom designators
+        args.first.bound_atoms }],
     ]
   end
 

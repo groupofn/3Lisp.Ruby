@@ -1,9 +1,20 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;                   ;;;
-;;;                   ;;;
-;;; 3LispR Test Cases ;;;
-;;;                   ;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;                                  ;;;
+;;;   Ruby Implementation of 3Lisp   ;;;
+;;;                                  ;;;
+;;;          Version 1.00            ;;;
+;;;                                  ;;;
+;;;           2011-05-20             ;;;
+;;;           Group of N             ;;;
+;;;                                  ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;                   
+;;; 3LispR Test Cases: 
+;;;    most from the Interim 3-Lisp Reference Manual, 
+;;;    some from BCS dissertation, 
+;;;    some elsewhere
+;;;                   
 
 
 ;;;;;;;;;;;;;
@@ -12,7 +23,8 @@
 ;;;
 
 
-;;; Pairs
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Pairs
 
 (pcons 'a 'b)       ; => '(A . B)
 (pcons '+ '[2 3])   ; => '(+ 2 3)
@@ -33,7 +45,9 @@
 (xcons 'acons)      ; => '(ACONS)
 (xcons 1 2 3)       ; Error
 
-;;; Rails and Sequences
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Rails and Sequences
 
 (rcons '1 '2 '3)          ; => '[1 2 3]
 (rcons 'a (pcons 'b 'c))  ; => '[A (B . C)]
@@ -139,8 +153,6 @@
 (map + [1 2 3 4 5 6 7 8 9] [1 2 3 4 5 6 7 8 9])
 (map 1+ [1 2 3 4 5 6 7 8 9])
 
-
-
 (COPY-VECTOR '[A B C])        ; '[A B C]
 (COPY-VECTOR	[])             ; []
 (LET [[Y [1 2 3]]]
@@ -191,8 +203,6 @@
 (index '+ [])                 ; => 0
 
 
-;;; No longer available
-
 (set s [])
 (push 1 s)
 (push 2 s)
@@ -206,11 +216,12 @@ s                             ; => [2 1]
 (pop s)                       ; => 2
 s                             ; => [1]
 
-;;; No longer available
 
+;~~~~~~~~~~
+; Closures
 
-(ccons 'x '[] 'y 'z)              ; => '{Closure: X [] Y Z}
-(ccons 'simple ↑global '[x] 'x)   ; => '{Closure: SiMPLE #<Environment:#####> [x] x}
+(ccons 'x '[] 'y 'z)              ; => '{Ordinary: X [] Y Z}
+(ccons 'simple ↑global '[x] 'x)   ; => '{Ordinary: SiMPLE #<Environment:#####> [x] x}
 (↓(ccons 'simple ↑global '[x] '(+ x 1)) 10) ; => 11
 
 (procedure-type (ccons 'x '[] 'y 'z))   ; => 'x
@@ -240,18 +251,22 @@ s                             ; => [1]
 (reflective ↑let)                         ; => $T
 (reflective (ccons 'x ↑(econs) 'y 'z))    ; => $F
 
-(de-reflect (ccons 'x ↑(econs) 'y 'z))    ; => '{Closure: SIMPLE #<Environment:#####> Y Z}
-(de-reflect ↑IF)                          ; => '{Closure: SIMPLE #<Environment:#####> [[PREMISE C1 C2] ENV CONT] (NORMALISE ...)}
+(de-reflect (ccons 'x ↑(econs) 'y 'z))    ; => '{Ordinary: SIMPLE #<Environment:#####> Y Z}
+(de-reflect ↑IF)                          ; => '{Ordinary: SIMPLE #<Environment:#####> [[PREMISE C1 C2] ENV CONT] (NORMALISE ...)}
 
-(reflectify ↓(ccons 'x ↑(econs) 'y 'z))   ; => {Closure: REFLECT #<Environment:#####> Y Z}
-(reflectify normalise)                    ; => {Closure: REFLECT #<Environment:#####> [EXP ENV CONT] (COND ...)}
+(reflectify ↓(ccons 'x ↑(econs) 'y 'z))   ; => {Ordinary: REFLECT #<Environment:#####> Y Z}
+(reflectify normalise)                    ; => {Ordinary: REFLECT #<Environment:#####> [EXP ENV CONT] (COND ...)}
 
-;;; Atoms
+
+;~~~~~~~
+; Atoms
 
 (acons)               ; => '3LispAtom######
 (= (acons) (acons))    ; => $F 
 
-;;; Typing
+
+;~~~~~~~~
+; Typing
 
 (type 1)              ; => 'NUMBER
 (type '1)             ; => 'NUMERAL
@@ -286,7 +301,25 @@ s                             ; => [1]
 (internal '+)         ; => $T
 (internal ↑+)         ; => $T
 
-;;; Identity
+(normal '3)               ; => $T
+(normal '(+ 2 3))         ; => $F
+(normal ↑(+ 2 3))         ; => $T
+(normal '[1 2 3])         ; => $T
+(normal '[1 2 A])         ; => $F
+(normal 'A)               ; => $F
+(normal ''A)              ; => $T
+
+(normal-rail '[])           ; => $T
+(normal-rail '[1 $T "a"])   ; => $T
+(normal-rail '[1 2 A])      ; => $F
+
+(primitive ↑+)              ; => $T  ; PRIMITIVE is now a PRIMITIVE
+(primitive ↑normalise)      ; => $F
+(primitive ↑if)             ; => $F
+
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Equality or rather referential identity
 
 (= 3 (+ 1 2))             ; => $T
 (= 5 '5)                  ; => $F
@@ -294,6 +327,7 @@ s                             ; => [1]
 (= $F $F $F $F)           ; => $T
 (= [10 20] [10 20])       ; => $T
 (= '[10 20] '[10 20])     ; => $F
+(= [10 20] '[10 20])      ; => $F
 (= ['10 '20] '[10 20])    ; => $F
 (= '[10 20] ['10 '20])    ; => $F
 (= car 3)                 ; => $F
@@ -313,7 +347,9 @@ s                             ; => [1]
 (isomorphic ↑(lambda simple [x] x)
             ↑(lambda simple [x] x)) ; => $T
 
-;;; Arithmetic Operations
+
+;~~~~~~~~~~~~~~~~~~~~~~~
+; Arithmetic Operations
 
 (* 2 2 2 2)     ; => 16
 (+ 1 3 5)       ; => 9
@@ -372,228 +408,9 @@ s                             ; => [1]
 (** 10 0)           ; => 1
 (** -5 3)           ; => -125
 
-;;; Procedure Definition and Variable Binding
 
-(define square (lambda simple [n] (* n n)))
-(square 19)         ; => 361
-(define factorial
-  (lambda simple [n]
-    (if (= n 0) 1 (* n (factorial (1- n))))))
-(factorial 5)       ; => 120
-
-(set factorial
-  (y-operator
-    (lambda simple [self]
-      (lambda simple [n]
-        (if (= n 0) 1 (* n (self (1- n))))))))
-(factorial 6)       ; => 720
-(factorial 100)
-
-(set even&odd
-  (y*-operator
-    (lambda simple [even odd]
-      (lambda simple [n]
-        (if (= n 0) $t (odd (1- n)))))
-    (lambda simple [even odd]
-      (lambda simple [n]
-        (if (= n 0) $f (even (1- n)))))))
-((1st even&odd) 2)  ; => $T
-((2nd even&odd) 2)  ; => $F
-
-(lambda simple [a b] (* a b))                 ; => {Closure: SIMPLE #<Environment:#######> [A B] (* A B)}
-((lambda simple [n] (+ n n)) 4)               ; => 8
-((lambda reflect [args env cont] args) . xxx) ; => 'XXX at level++ prompt
-
-(simple ↑(bind 'x '1 (econs)) '[] 'x)         ; => {Closure: SIMPLE #<Environment:#######> [] X}
-((simple ↑(bind 'x '1 (econs)) '[] 'x))       ; => 1
-((simple ↑global '[x] '(+ x 2)) 99)           ; => 101
-((simple ↑(econs) '[x] '(acons)) 99)          ; Error   
-
-(set reflect-test
-  (lambda reflect [args env cont]
-    (block (set stash args) (cont ''ok))))    ; This is the manual version, which is wrong
-(reflect-test + (+ 2 2))
-stash                                         ; Error
-(reflect-test . +)
-stash                                         ; Error
-
-(set reflect-test
-  (lambda reflect [args env cont]
-    (block (rebind 'stash ↑args env) (cont ''ok))))    ; This is what I believe to be the correct version.
-(reflect-test + (+ 2 2))
-stash                                         ; => '[+ (+ 2 2)]
-(reflect-test . +)
-stash                                         ; => '+
-
-(set reflect!-test
-  (lambda reflect! [args env cont]
-    (block (rebind 'stash ↑args env) (cont ''ok))))    ; This is what I believe to be the correct version.
-(reflect!-test + (+ 2 2))
-stash                                         ; => '[{Primitive closure: SIMPLE  numbers +} 4]
-(reflect!-test . +)
-stash                                         ; => '{Primitive closure: SIMPLE  numbers +}
-
-(set macro-test
-  (lambda macro [arg]
-    (block (print ↑arg) arg)))    ; This is what I believe to be the correct version.
-(macro-test (+ 2 2))              ; => 4 ; printing '(+ 2 2)
-(macro-test . [+])                ; => {Primitive closure: SIMPLE  numbers +}; printing '+
-
-; rebind test
-(let [[env (bind 'x '1 (bind 'y '2 (econs)))]]
-  (block (rebind 'y ↑(+ 2 3) env)
-         (rebind 'z '$T env)
-         (map (lambda simple [a] (binding a env)) (bound-atoms env))))  ; => ['1 '$T '5]
-
-(set x (+ 2 2))
-x                 ; => 4
-(set x (+ x x))
-x                 ; => 8
-
-(set x 'y)
-(setref x (* 2 2))  ; I found myself having to use "↓var!" in the definition of SETREF
-y                   ; => 4
-
-
-(binding 'y (bind 'x '1 (bind 'y '2 (bind 'z '3 (econs)))))  ; => '2
-(binding 'normalise global)                                 ; => {Kernel closure: SIMPLE ...}
-(let [[x (+ 1 2)]]
-  ((lambda reflect [args env cont]
-    (cont (binding 'x env)))))                              ; => 3
-
-
-(binding 'x (bind 'x '2 (econs)))         ; => '2
-(binding 'x (bind '[x] '[2] (econs)))     ; => '2
-(binding 'x (bind '[x] ''[2] (econs)))    ; => ''2      ; I don't understand this one!!!
-(binding 'z (bind '[x z] '[2 3] (econs))) ; => '3
-(binding 'x (bind '[x y] '[[2] 3] (econs)))     ; => '[2]
-(binding 'z (bind '[x [z]] '[2 [3]] (econs)))   ; => '3
-(bind '[x] '2 (econs))                    ; Error
-(bind '[x] '''[2] (econs))                ; Error
-(bind '(a . b) '(1 . 2) (econs))          ; Error
-
-(let [[x 3] [y 4]] (+ x y))               ; => 7
-((lambda simple [x y] (+ x y)) 3 4)
-
-(let [[[a b] (rest [1 2 3])]] (+ a b))    ; => 5
-(let [[x 3]]
-  (let [[x 4] [y x]] (+ x y)))            ; => 7
-
-(let [[x 3]]
-  (letseq [[x 4] [y x]] (+ x y)))         ; => 8
-
-(letrec [[even (lambda simple [n]
-                  (if (= n 0) $T (odd (1- n))))]
-          [odd (lambda simple [n]
-                 (if (= n 0) $F (even (1- n))))]]
-  (scons (even 2) (odd 2)))               ; => [$T $F]
-
-
-;;; Control
-
-(if (= 1 1) 'a 'b)        ; => 'A
-(if (= 1 2) 'a  'b)       ; => 'B
-(ef (= 1 2)
-    (print "Hello")
-    (print "Good-bye"))
-(if (= 1 2)
-    (print "Hello")
-    (print "Good-bye"))
-(ef [] 'a 'b)             ; Error
-
-(cond 
-  [(= 1 2) 10]
-  [(= 1 3) 20]
-  [(= 1 1) 30]
-  [$T 40])                ; => 30
-
-(cond
-  [(= 1 2) (print "10")]
-  [(= 1 3) (print "20")]
-  [(= 1 1) (print "30")]
-  [$T      (print "40")]) ; => 'OK
-
-(block
-  (print "2 ")
-  (print "+ ")
-  (print "2 ")
-  (newline)
-  'done)                  ; => 'DONE; displaying "2 + 2 "
-
-(catch (+ 2 2))           ; => 4
-(catch (+ 2 (throw 3)))   ; => 3
-(catch 
-  (block 
-    (throw (+ 3 3))
-    100))                 ; => 6
-
-(catch
-  (block 
-    (print "-2 ")
-    (print "-1 ")
-    (throw 'blast-off)
-    (print "1 ")
-    (print "2 ")))        ; => 'BLAST-OFF ; displaying "-2 -1"
-
-(catch
-  (+ (catch (* 5 3))
-     (throw (* 6 (throw 4)))))  ; => 4
-
-(throw (+ 2 2))           ; => '4 ; up one level
-
-; delay & force
-(set x (delay (* y y)))
-(set y 7)
-(force x)                 ; => 49
-(set y 9)
-(force x)                 ; => 81
-(define new-if
-  (lambda macro [p c1 c2]
-    `(force (ef ,p (delay ,c1) (delay ,c2)))))
-(new-if (= (+ 2 2) 4)
-        (print "yes")
-        (print "no"))     ; => OK; printing "YES"
-
-(set x (delay (print greeting)))
-(set greeting "Hi there")
-(force x) ; => 'OK; printing "Hi there"
-(set Greeting "Good-bye")
-(force x) ; => 'OK; printing "Good-bye"
-
-; selectq & select
-
-(define activity
-  (lambda simple [day]
-    (selectq day
-      [sunday 'sleep]
-      [[monday tuesday] 'work]
-      [$T 'ruminate])))
-(activity 'sunday)              ; => 'SLEEP
-(activity 'tuesday)             ; => 'WORK
-(activity 'wednesday)           ; => 'RUMINATE
-
-(define activity-2
-  (lambda simple [day]
-    (select day
-      ['sunday 'sleep]
-      [['monday 'tuesday] 'work]
-      [$T 'ruminate])))
-(activity-2 'sunday)              ; => 'SLEEP
-(activity-2 'tuesday)             ; => 'WORK
-(activity-2 'wednesday)           ; => 'RUMINATE
-
-
-; do
-
-(define new-reverse
-  (lambda simple [vec]
-    (do [[v vec (rest v)] [r ((vector-constructor vec)) (prep (1st v) r)]]
-      [[(empty v) r]])))
-      
-(new-reverse [1 2 3 4 5])         ; => [5 4 3 2 1]
-(new-reverse '[1 '[2] [3]])   ; => '[[3] '[2] 1]
-
-;;; True Value Operations
+;~~~~~~~~~~~~~~~~~~~~~~~~~
+; Truth-Value Operations
 
 (not $F)          ; => $T
 (not (even 102))  ; => $F
@@ -610,13 +427,71 @@ y                   ; => 4
     x))                             ; => 3
 
 
-;;; Structural Side Effects
+(and $T $T $F)
+(and (= '[] '[]))
+(and)
+(and . (tail 1 [$F $T $T]))
 
-;;; REPLACE
+(or $F $F $T)
+(or (= '[] '[]))
+(or)
+(or . (tail 1 [$T $F $F]))
+
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Level Crossing Operations
+
+↑5              ; => '5
+↑(+ 2 3)        ; => '5
+↑(lambda simple [x] x)      ; => '{Closure: SIMPLE #<Environemnt:#####> [x] x}
+['(= 2 3) ↑(= 2 3)]         ; => ['(= 2 3) '$F]
+(let [[x [2 3]]]
+  (= x [2 3]))              ; => $T
+(let [[x [2 3]]]
+  (= ↑x ↑[2 3]))            ; => $F
+
+↓'4                   ; => 4
+↓(NTH 2 '[10 20 30])  ; => 20
+↓↑$T                  ; => $T
+↓3                    ; Error
+↓'X                   ; Error
+
+
+;;; ↑↓
+
+; ↓ tests from diss.p483
+↓'[1 2 3 4]
+
+↓(prep '1 (rcons '2 '3 '4))
+
+↓↓''''A
+
+(+ . ↓(rcons '1 '2))
+
+(let [[x '$F]] [(type x) (type ↓x)])
+
+
+; these next four ain't correct
+↓'(pcons 'a 'b)
+(↓(pcons 'pcons (rcons ''a ''b)))
+↓(pcons 'a 'b)
+↓(+ 2 3)
+
+
+(referent '1 global)                ; => 1
+(referent 'x (bind 'x '1 (econs)))  ; => 1    
+(referent ''(+ 2 2) (econs))        ; => '(+ 2 2)
+(referent (pcons '+ '[2 2]) global) ; => 4
+
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Structural Side Effects
+
+; REPLACE
 
 (let [[x '(+ 2 3)]]
   (block (replace (cdr x) '[20 30])
-         x))                        ; => '(+ 20 30)
+         x))                        ; Error; Manual: => '(+ 20 30)
 
 (let [[x '(+ 2 3)]]
   (block (replace x '(* 2 3))
@@ -624,7 +499,7 @@ y                   ; => 4
 
 (let [[x '[]]]
   (block (replace x '[new tail])
-         x))                        ; => '[NEW TAIL]
+         x))                        ; Error; Manual: => '[NEW TAIL]
 
 ; test case for replacing closure
 (define add
@@ -674,7 +549,7 @@ y                                   ; => '[** THREE]
 
 
 ; atom replacement not supported, because absorbed to Ruby's symbol ...
-; thus the following examples won't work
+; thus the following 2 examples won't work
 
 (let [[x '(+ 2 3)]]
   (block (replace (car x) '*)
@@ -685,35 +560,140 @@ y                                   ; => '[** THREE]
          x))   ; Error
 
 
-;;; Level Crossing Operations
+;~~~~~~~~~~~~
+; Backquote
 
-↑5              ; => '5
-↑(+ 2 3)        ; => '5
-↑(lambda simple [x] x)      ; => '{Closure: SIMPLE #<Environemnt:#####> [x] x}
-['(= 2 3) ↑(= 2 3)]         ; => ['(= 2 3) '$F]
-(let [[x [2 3]]]
-  (= x [2 3]))              ; => $T
-(let [[x [2 3]]]
-  (= ↑x ↑[2 3]))            ; => $F
+(rebind 'b ''2 global)
+(rebind 'c '''3 global)
 
-↓'4                   ; => 4
-↓(NTH 2 '[10 20 30])  ; => 20
-↓↑$T                  ; => $T
-↓3                    ; Error
-↓'X                   ; Error
-
-(referent '1 global)                ; => 1
-(referent 'x (bind 'x '1 (econs)))  ; => 1    
-(referent ''(+ 2 2) (econs))        ; => '(+ 2 2)
-(referent (pcons '+ '[2 2]) global) ; => 4
+`1                ; => '1
+`(a . b)          ; => '(A. B)
+`(,b . a)         ; => '(2 . A)
+`[a b]            ; => '[A B]
+`[a ,b c]         ; => '[A 2 C]
+`[[a b][,c d]]    ; => '[[A B] ['3 D]]
+``[a ,b ,,c]      ; => '(RCONS 'A B '3)
 
 
-;;; System Utilities
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Procedure Definition and Variable Binding
 
-(version)             ; => "3Lisp version R01, April 28, 2011"
+(define square (lambda simple [n] (* n n)))
+(square 19)         ; => 361
+(define factorial
+  (lambda simple [n]
+    (if (= n 0) 1 (* n (factorial (1- n))))))
+(factorial 5)       ; => 120
+
+(set factorial
+  (y-operator
+    (lambda simple [self]
+      (lambda simple [n]
+        (if (= n 0) 1 (* n (self (1- n))))))))
+(factorial 6)       ; => 720
+(factorial 100)
+
+(set even&odd
+  (y*-operator
+    (lambda simple [even odd]
+      (lambda simple [n]
+        (if (= n 0) $t (odd (1- n)))))
+    (lambda simple [even odd]
+      (lambda simple [n]
+        (if (= n 0) $f (even (1- n)))))))
+((1st even&odd) 2)  ; => $T
+((2nd even&odd) 2)  ; => $F
+
+(lambda simple [a b] (* a b))                 ; => {Ordinary: SIMPLE #<Environment:#######> [A B] (* A B)}
+((lambda simple [n] (+ n n)) 4)               ; => 8
+((lambda reflect [args env cont] args) . xxx) ; => 'XXX at level++ prompt
+
+(simple ↑(bind 'x '1 (econs)) '[] 'x)         ; => {Ordinary: SIMPLE #<Environment:#######> [] X}
+((simple ↑(bind 'x '1 (econs)) '[] 'x))       ; => 1
+((simple ↑global '[x] '(+ x 2)) 99)           ; => 101
+((simple ↑(econs) '[x] '(acons)) 99)          ; Error   
+
+(set reflect-test
+  (lambda reflect [args env cont]
+    (block (set stash args) (cont ''ok))))    ; This is the manual version, which is wrong
+(reflect-test + (+ 2 2))
+stash                                         ; Error
+(reflect-test . +)
+stash                                         ; Error
+
+(set reflect-test
+  (lambda reflect [args env cont]
+    (block (rebind 'stash ↑args env) (cont ''ok))))    ; This is what I believe to be the correct version.
+(reflect-test + (+ 2 2))
+stash                                         ; => '[+ (+ 2 2)]
+(reflect-test . +)
+stash                                         ; => '+
+
+(set reflect!-test
+  (lambda reflect! [args env cont]
+    (block (rebind 'stash ↑args env) (cont ''ok))))    ; This is what I believe to be the correct version.
+(reflect!-test + (+ 2 2))
+stash                                         ; => '[{Primitive: SIMPLE #<Environment:#######> numbers +} 4]
+(reflect!-test . +)
+stash                                         ; => '{Primitive: SIMPLE #<Environment:#######> numbers +}
+
+(set macro-test
+  (lambda macro [arg]
+    (block (print ↑arg) arg)))    ; This is what I believe to be the correct version.
+(macro-test (+ 2 2))              ; => 4 ; printing '(+ 2 2)
+(macro-test . [+])                ; => {Primitive: SIMPLE  numbers +}; printing '+
+
+; rebind test
+(let [[env (bind 'x '1 (bind 'y '2 (econs)))]]
+  (block (rebind 'y ↑(+ 2 3) env)
+         (rebind 'z '$T env)
+         (map (lambda simple [a] (binding a env)) (bound-atoms env))))  ; => ['1 '$T '5]
+
+(set x (+ 2 2))
+x                 ; => 4
+(set x (+ x x))
+x                 ; => 8
+
+(set x 'y)
+(setref x (* 2 2))  ; I found myself having to use "↓var!" in the definition of SETREF
+y                   ; => 4
 
 
-;;; Other General Utilities
+(binding 'y (bind 'x '1 (bind 'y '2 (bind 'z '3 (econs)))))  ; => '2
+(binding 'normalise global)                                 ; => {Kernel: SIMPLE ...}
+(let [[x (+ 1 2)]]
+  ((lambda reflect [args env cont]
+    (cont (binding 'x env)))))                              ; => 3
+
+(binding 'x (bind 'x '2 (econs)))         ; => '2
+(binding 'x (bind '[x] '[2] (econs)))     ; => '2
+(binding 'x (bind '[x] ''[2] (econs)))    ; => ''2      ; I don't understand this one!!!
+(binding 'z (bind '[x z] '[2 3] (econs))) ; => '3
+(binding 'x (bind '[x y] '[[2] 3] (econs)))     ; => '[2]
+(binding 'z (bind '[x [z]] '[2 [3]] (econs)))   ; => '3
+(bind '[x] '2 (econs))                    ; Error
+(bind '[x] '''[2] (econs))                ; Error
+(bind '(a . b) '(1 . 2) (econs))          ; Error
+
+(let [[x 3] [y 4]] (+ x y))               ; => 7
+((lambda simple [x y] (+ x y)) 3 4)
+
+(let [[[a b] (rest [1 2 3])]] (+ a b))    ; => 5
+(let [[x 3]]
+  (let [[x 4] [y x]] (+ x y)))            ; => 7
+
+(let [[x 3]]
+  (letseq [[x 4] [y x]] (+ x y)))         ; => 8
+
+(letrec [[even (lambda simple [n]
+                  (if (= n 0) $T (odd (1- n))))]
+          [odd (lambda simple [n]
+                 (if (= n 0) $F (even (1- n))))]]
+  (scons (even 2) (odd 2)))               ; => [$T $F]
+
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~
+; Other General Utilities
 
 (id 3)                ; => 3
 (id (+ 2 2))          ; => 4
@@ -738,75 +718,88 @@ y                                   ; => '[** THREE]
 (normalise 'a (econs) quote)    ; => '(BINDING EXP ENV)
 (map quote [1 2])               ; => ['(1st (2nd args)) '(1st (2nd args))]
 
-(normal '3)               ; => $T
-(normal '(+ 2 3))         ; => $F
-(normal ↑(+ 2 3))         ; => $T
-(normal '[1 2 3])         ; => $T
-(normal '[1 2 A])         ; => $F
-(normal 'A)               ; => $F
-(normal ''A)              ; => $T
-
-(normal-rail '[])           ; => $T
-(normal-rail '[1 $T "a"])   ; => $T
-(normal-rail '[1 2 A])      ; => $F
-
-(primitive ↑+)              ; => $T  ; PRIMITIVE is now a PRIMITIVE
-(primitive ↑normalise)      ; => $F
-(primitive ↑if)             ; => $F
-
-; (member ↑ef primitive-closures)  ; => $T   ; PRIMITIVE-CLOSURES no longer provided ...
-; (member ↑if primitive-closures)  ; => $F   ; PRIMITIVE-CLOSURES no longer provided ...
-
 ; there are no cond-helper and block-helper
 
 (and-helper '[(= 2 2) (= 3 3)] global id)     ; => '$T
 (or-helper '[(= 2 2) (= 3 4)] global id)      ; => '$T
 
-;;; Processor
 
-(normalise '1 [] id)                        ; => '1
-(normalise 'x (bind 'x '1 (econs)) id)      ; => '1
-(normalise '(+ 2 2) global id)              ; => '4
-(normalise '+ global quote)                 ; => '(BINDING EXP ENV)
-(normalise '$T global quote)                ; => 'EXP
+;~~~~~~~~~~~~~~~~~~~
+; System Utilities
 
-(reduce '+ '[2 2] global id)                ; => '4
-(reduce 'if '[$T 1 2] global id)            ; => '1
-(reduce '+ '[2 2] global
-  (lambda macro [x] ↑x))                    ; => '↑(↓proc! . ↓args!)
-
-(normalise-rail '[1] [] id)                       ; => '[1]
-(normalise-rail '[x x] (bind 'x '1 (econs)) ID)   ; => '[1 1]
-(normalise-rail '[(+ 2 2)] global id)             ; => '[4]
-(normalise-rail '[+] global
-  (lambda macro [x] ↑x))                          ; => '(PREP FIRST! REST!)
-(normalise-rail '[] global
-  (lambda macro [x] ↑x))                          ; => '(RCONS)
+(version)             ; => "3Lisp Ruby Implementation, Version 1.00, May 20, 2011"
 
 
-(binding 'x (bind '[x] '[2] global))              ; => '2
-(binding 'x (bind '[x] ''[2] global))             ; => ''2 ; why?
+;~~~~~~~~~
+; Control
+
+(if (= 1 1) 'a 'b)        ; => 'A
+(if (= 1 2) 'a  'b)       ; => 'B
+(ef (= 1 2)
+    (print "Hello")
+    (print "Good-bye"))
+(ef (= 1 1) (+ 3 3) (* 3 3))        ; => 6
+(if (= 1 2)
+    (print "Hello")
+    (print "Good-bye"))
+((if (even 3) + -) 4 5)             ; => -1
+((nth 2 [+ if lambda]) $T 0 1)      ; => 0
+(ef [] 'a 'b)             ; Error
+
+(cond 
+  [(= 1 2) 10]
+  [(= 1 3) 20]
+  [(= 1 1) 30]
+  [$T 40])                ; => 30
+
+(cond
+  [(= 1 2) (print "10")]
+  [(= 1 3) (print "20")]
+  [(= 1 1) (print "30")]
+  [$T      (print "40")]) ; => 'OK
+
+(cond
+	[(= 1 2) 'ha]
+	[(not (= (* 3 3) (/ 18 2))) (empty [])]
+	[$T 'blah])                       ; => 'BLAH
+
+(block
+  (print "2 ")
+  (print "+ ")
+  (print "2 ")
+  (newline)
+  'done)                  ; => 'DONE; displaying "2 + 2 "
+
+(block (newline) (newline) (newline)) ; => 'OK
 
 
-;;; Booleans
+; SELECT & SELECTQ
 
-(and $T $T $F)
-(and (= '[] '[]))
-(and)
-(and . (tail 1 [$F $T $T]))
+(select 1 [1 2] [2 3] [3 4])
+(select 3 [1 2] [2 3] [3 4])
 
-(or $F $F $T)
-(or (= '[] '[]))
-(or)
-(or . (tail 1 [$T $F $F]))
+(define activity
+  (lambda simple [day]
+    (selectq day
+      [sunday 'sleep]
+      [[monday tuesday] 'work]
+      [$T 'ruminate])))
+(activity 'sunday)              ; => 'SLEEP
+(activity 'tuesday)             ; => 'WORK
+(activity 'wednesday)           ; => 'RUMINATE
 
-;;; Equality (actually referential identity)
+(define activity-2
+  (lambda simple [day]
+    (select day
+      ['sunday 'sleep]
+      [['monday 'tuesday] 'work]
+      [$T 'ruminate])))
+(activity-2 'sunday)              ; => 'SLEEP
+(activity-2 'tuesday)             ; => 'WORK
+(activity-2 'wednesday)           ; => 'RUMINATE
 
-(= [1 2 3] [1 2 3])
-(= '[1 2 3] '[1 2 3])
-(= [1 2 3] '[1 2 3])
 
-;;; LET
+; The LET familty
 
 (let [[x 10][y (empty [])]]
 	(if y
@@ -828,62 +821,15 @@ y                                   ; => '[** THREE]
   [(even 10) (even 11) (odd 10) (odd 11)])
 
 
-;;; SELECT
-
-(select 1 [1 2] [2 3] [3 4])
-(select 3 [1 2] [2 3] [3 4])
-
-
-;;; DO 
+; DO
 
 (define new-reverse
   (lambda simple [vec]
-    (do [[v vec (rest v)]
-         [r ((vector-constructor vec)) (prep (1st v) r)]]
-        [[(empty v) r]])))
-
-(new-reverse [1 2 3])        
-
-;;; binding
-
-(rebind 'a '10 global)
-(binding 'a global)
-
-;;; ↑↓
-
-; ↓ tests from diss.p483
-↓'[1 2 3 4]
-
-↓(prep '1 (rcons '2 '3 '4))
-
-↓↓''''A
-
-(+ . ↓(rcons '1 '2))
-
-(let [[x '$F]] [(type x) (type ↓x)])
-
-
-; these last four ain't correct
-
-↓'(pcons 'a 'b)
-(↓(pcons 'pcons (rcons ''a ''b)))
-↓(pcons 'a 'b)
-↓(+ 2 3)
-
-;;; Backquote
-
-(rebind 'b ''2 global)
-(rebind 'c '''3 global)
-
-`1
-`(a . b)
-`(,b . a)
-`[a b]
-`[a ,b c]
-`[[a b][,c d]]
-``[a ,b ,,c]
-
-
+    (do [[v vec (rest v)] [r ((vector-constructor vec)) (prep (1st v) r)]]
+      [[(empty v) r]])))
+      
+(new-reverse [1 2 3 4 5])         ; => [5 4 3 2 1]
+(new-reverse '[1 '[2] [3]])   ; => '[[3] '[2] 1]
 
 ;;;
 ;;; Basics 
@@ -891,28 +837,14 @@ y                                   ; => '[** THREE]
 ;;;;;;;;;;;;;
 
 
-(set factorial
-  (y-operator
-    (lambda simple [self]
-      (lambda simple [n]
-        (if (= n 0) 1 (* n (self (1- n))))))))
-(factorial 10)
 
-(define DEFEIN
-  (lambda macro [label form]
-    `(block (set ,label (y-OPERATOR (lambda simple [,label] ,form)))
-            ,↑label)))
-
-(defein fact (lambda simple [n]
-  (if (zero n)
-      1
-      (* n (fact (1- n))))))
-(fact 10)
-
-;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; Lambda
+;;; Lambda and Recursion
 ;;;
+
+;~~~~~~~~~~~~~~~
+; Basic lambda
 
 ((lambda simple [x] x) 100)
 
@@ -976,23 +908,34 @@ if
      (nth 1 args))))
 (trouble1 [0 1]) ; should => 2
 
-;;;
-;;; Lambda
-;;;
-;;;;;;;;;;;;;
 
-;;;;;;;;;;;;;;;;
-;;;
-;;; Recursion
-;;;
-
-;;; simple recursion
+;~~~~~~~~~~~~
+; Recursion 
 
 (define factorial (lambda simple [x] (if (= x 0) 1 (* x (factorial (- x 1))))))
 (factorial 0)
 (factorial 100)
 
-;;; mutual recursion
+(set factorial
+  (y-operator
+    (lambda simple [self]
+      (lambda simple [n]
+        (if (= n 0) 1 (* n (self (1- n))))))))
+(factorial 10)
+
+(define DEFEIN
+  (lambda macro [label form]
+    `(block (set ,label (y-OPERATOR (lambda simple [,label] ,form)))
+            ,↑label)))
+
+(defein fact (lambda simple [n]
+  (if (zero n)
+      1
+      (* n (fact (1- n))))))
+(fact 10)
+
+;~~~~~~~~~~~~~~~~~~
+; mutual recursion
 
 (define even
   (lambda simple [n]
@@ -1013,44 +956,21 @@ if
 (odd 100)
 (odd 101)
 
-;;;
-;;; Recursion
-;;;
-;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Control flow
-;;;
-
-(block (newline) (newline) (newline)) ; => 'OK
-
-(ef (= 1 1) (+ 3 3) (* 3 3))        ; => 6
-
-(cond
-	[(= 1 2) 'ha]
-	[(not (= (* 3 3) (/ 18 2))) (empty [])]
-	[$T 'blah])                       ; => 'BLAH
-
-((if (even 3) + -) 4 5)             ; => -1
-((nth 2 [+ if lambda]) $T 0 1)      ; => 0
+(even 10000) ; just wait a bit
 
 ;;;
-;;; Control flow
+;;; Lambda and Recursion
 ;;;
-;;;;;;;;;;;;;;;;;;;
-
-; PRIMITIVE as continuation
-
-(normalise '10 global print)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; Reflection 
-;;;
+;;; Processor and Reflection 
 
-;;; Going meta
+;~~~~~~~~~~~~
+; Going meta
 
 1
 (normalise '1 global id)
@@ -1061,7 +981,9 @@ if
 
 (normalise '(normalise '(normalise '(normalise '(read-normalise-print " somewhere > " " somewhere = " global) global id) global id) global id) global id)
 
-;;; basic reflection tests 
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~
+; Basic reflection tests 
 
 ; test case from Implementation paper
 
@@ -1070,17 +992,20 @@ if
 
 (define quit (lambda reflect [args env cont] 'done))
 (+ 2 (quit))
-(read-normalise-print "> " "= " global)
+(read-normalise-print " > " " = " global)
 (read-normalise-print " ~ " " ~ " global)
 (read-normalise-print " ? " " ! " global)
 (quit)
 (quit)
 
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ; environment manipulation
 
 ((lambda reflect [[x] env cont] (normalise '(+ x 1) (bind 'x x env) cont)) 10)  ; => 11
 
-;;; DEFINE can be defined
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~
+; DEFINE can be defined
 
 ((lambda reflect [args env cont]
    (block (rebind 'b '10 env)
@@ -1098,7 +1023,34 @@ b  ; => 10
     (+ 100 x)))
 (100+ 1) ; should => 101
 
-;;; SCHEME-CATCH
+
+
+;~~~~~~~~~~~~~~~~
+; CATCH & THROW
+
+(catch (+ 2 2))           ; => 4
+(catch (+ 2 (throw 3)))   ; => 3
+(catch 
+  (block 
+    (throw (+ 3 3))
+    100))                 ; => 6
+
+(catch
+  (block 
+    (print "-2 ")
+    (print "-1 ")
+    (throw 'blast-off)
+    (print "1 ")
+    (print "2 ")))        ; => 'BLAST-OFF ; displaying "-2 -1"
+
+(catch
+  (+ (catch (* 5 3))
+     (throw (* 6 (throw 4)))))  ; => 4
+
+(throw (+ 2 2))           ; => '4 ; up one level
+
+
+; SCHEME-CATCH
 
 (define scheme-catch
   (lambda reflect [[tag body] catch-env catch-cont]
@@ -1115,7 +1067,31 @@ b  ; => 10
 					                (punt 15)
 									(- x 1))))))) 1)
 
-;;; BREAK
+
+;~~~~~~~~~~~~~~~~
+; DELAY & FORCE
+
+(set x (delay (* y y)))
+(set y 7)
+(force x)                 ; => 49
+(set y 9)
+(force x)                 ; => 81
+(define new-if
+  (lambda macro [p c1 c2]
+    `(force (ef ,p (delay ,c1) (delay ,c2)))))
+(new-if (= (+ 2 2) 4)
+        (print "yes")
+        (print "no"))     ; => OK; printing "YES"
+
+(set x (delay (print greeting)))
+(set greeting "Hi there")
+(force x) ; => 'OK; printing "Hi there"
+(set Greeting "Good-bye")
+(force x) ; => 'OK; printing "Good-bye"
+
+
+;~~~~~~~~
+; BREAK
 
 (define BREAK 
   (lambda reflect [[arg] env cont]
@@ -1137,7 +1113,28 @@ b  ; => 10
 (factorial-break 5)
 
 
-;;; More reflective continuation
+;~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Reflective continuation
+
+(normalise '1 [] id)                        ; => '1
+(normalise 'x (bind 'x '1 (econs)) id)      ; => '1
+(normalise '(+ 2 2) global id)              ; => '4
+(normalise '+ global quote)                 ; => '(BINDING EXP ENV)
+(normalise '$T global quote)                ; => 'EXP
+
+(reduce '+ '[2 2] global id)                ; => '4
+(reduce 'if '[$T 1 2] global id)            ; => '1
+(reduce '+ '[2 2] global
+  (lambda macro [x] ↑x))                    ; => '↑(↓proc! . ↓args!)
+
+(normalise-rail '[1] [] id)                       ; => '[1]
+(normalise-rail '[x x] (bind 'x '1 (econs)) ID)   ; => '[1 1]
+(normalise-rail '[(+ 2 2)] global id)             ; => '[4]
+(normalise-rail '[+] global
+  (lambda macro [x] ↑x))                          ; => '(PREP FIRST! REST!)
+(normalise-rail '[] global
+  (lambda macro [x] ↑x))                          ; => '(RCONS)
+
 
 (define alpha
   (lambda reflect [[alpha-arg] alpha-env alpha-cont] [alpha-arg alpha-env alpha-cont]))
@@ -1146,22 +1143,32 @@ b  ; => 10
 (normalise 'x global alpha)
 (normalise '(+ 2 3) global alpha)
 (normalise '[] global alpha)
-
-; this is a mistaken one ...
-
-((lambda simple [x y]  
-   (normalise '[x x y y] global alpha))
-3 4)                                          ; Error
-
-((lambda simple [x y]  ;; this is a correct one ...
-   (normalise '[+ - * /] global alpha))
-3 4)
-
 (normalise-rail '[] global alpha)
 (normalise '(lambda simple [a] (+ a a)) global alpha)
 
 
-; Nasty ones from the Manual pp.94-97
+; this is a mistaken one ...
+((lambda simple [x y]  
+   (normalise '[x x y y] global alpha))
+3 4)                                          ; Error
+
+; this is a correct one ...
+((lambda simple [x y]  
+   (normalise '[+ - * /] global alpha))
+3 4)
+
+
+;;;
+;;; Reflection
+;;;
+;;;;;;;;;;;;;;;;;;
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Nasty ones from the Manual pp.94-97
+;;;
 
 ; 1. Replacing a simple closure with a reflective one. The test 
 ;    for reflectiveness is done prior to normalizing the arguments. 
@@ -1199,37 +1206,18 @@ b  ; => 10
 (let [[dummy-id (lambda simple [x] x)]]
   (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
 
-(set di (lambda simple [struct] struct)) 
-(normalise `(id (replace ,↑↑di ↑quote)) global di)
-
+; or 
 (set di (lambda simple [struct] struct)) 
 (normalise `(replace ↑di ↑quote) global di)
 
-
-(let [[dummy-id (lambda simple [x] x)]]
-  (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
-
-(normalise '1 global quote)
-
-(normalise '1 global (lambda reflect [[a] e c] (c ↑a)))
-
-(set di (lambda simple [struct] struct)) 
-(set uup (lambda simple [x] (up x)))
-(normalise `(id (replace ,↑↑di ↑uup)) global di)
-
 (let [[dummy-id (lambda simple [x] (print ↑x))]]
-  (normalise `(id (replace ,↑↑dummy-id ↑uup)) global dummy-id))     ; => '''OK
-
-((lambda simple [dummy-id]
-   (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))
- (lambda simple [x] (print ↑x)))
+  (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))     ; => '''OK
 
 
 ; 4. Tampering with the environment of a continuation closure. The environment designator 
 ;    within a standard continuation closure can be changed, making it non-standard. In the 
 ;    following, a new binding for NORMALISE is stuffed into a C-ARGS! closure; this binding 
 ;    will be used when it comes to expanding the closure. 
-
 
 ; Manual version:
 
@@ -1242,7 +1230,8 @@ b  ; => 10
 
 ((lambda simple x (print 'hello)) . (change-cont (+ 2 2)))
 
-; Can't really do the above in the 3LispR version ...
+
+; or a roughly equivalent 3LispR version:
 
 (define prn
   (lambda simple [x] (print x)))
@@ -1260,6 +1249,8 @@ b  ; => 10
 
 ((lambda simple x (print 'hello)) . (change-cont (+ 2 2)))
 
+; But can't really do the above in the 3LispR version ...
+
 
 ; 5. Sharing of environment tails betwccn C-PROC! and C-ARGS! continuations. A C-ARGS! 
 ;    closure contains an environment designator whose first tail is the environment 
@@ -1276,7 +1267,8 @@ x1                                            ; => '{Kernel closure: ... } ; PRO
 
 x2                                            ; => '{Kernel closure: ... } ; ARGS-CONTINUATION
 
-; (= (environment-designator x1) (rest (environment-designator x2)))  ; this cannot be tested in 3LispR
+; this cannot be tested in 3LispR, because Environment layering is no longer accessible
+; (= (environment-designator x1) (rest (environment-designator x2)))  
 
 
 ; 6. Fresh	top~level	continuations. Each time through READ-NORMALIZE-PRINT	a	new	
@@ -1300,17 +1292,14 @@ x2                                            ; => '{Kernel closure: ... } ; ARG
 ;    be taken in such cases because the primitive may never get invoked.
 
 (normalise '(normalise '10 global print) global quote)  ; => '↑(↓PROC! . ↓ARGS!)
-
 (normalise '10 global print)                            ; => 'OK ; display 10
 
 
 ; 8. Rebinding a kernel procedure in the global environment. This is almost always fatal.
 
-; In 3LispR, this is blcoked now.
-
-;;; blocked now ...
-
+; In 3LispR, this is blocked now.
 (set normalise 10)
+
 
 ; 9. Smashing a kernel procedure, its body, or its pattern. This too is usually fatal.
 
@@ -1327,17 +1316,20 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 
 (replace (foot ↑global) '[hal])  ; This no longer applies.
 
-; 11.Circular rails can cause NORMALISE to hang - even normal-form ones.  ; can no longer generate circular rail
+
+; 11.Circular rails can cause NORMALISE to hang - even normal-form ones.  
+; can still generate circular rail through concatenating a rail to itself
+; but rail processing is now controlled by length ...
 
 (set x (rcons '1))
 (block (replace (foot x) x) 'done)
 (block (normalise x global id) 'done)
 
+;;;
+;;; Nasty ones from the Manual pp.94-97
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;
-;;; Reflection
-;;;
-;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -1345,7 +1337,8 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 ;;; From a discussion with Brian
 ;;;
 
-;;; Brian's original code
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Brian's original code, already included in init.3lisp
 
 (define normalise#
   (lambda simple [exp env cont]
@@ -1386,12 +1379,15 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
       (lambda simple [clauses!]
         (cont (nth (length clauses!) clauses!))))))
 
-;;; Simple test case for block#
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Simple test case for block#
 
 (block# (+ 2 3) (print 'A) (* 2 3))
 
-;;; Test cases. The first should print "AB" before returning '[5 6];
-;;; the second should print "BA" but return the same result.
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Test cases. 
+;    The first should print "AB" before returning '[5 6];
+;    The second should print "BA" but return the same result.
 
 (normalise
    '[(block (+ 2 3) (print 'A) (+ 2 3))
@@ -1405,19 +1401,18 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
    global
    id)
 
-;;; Note that the definitions of NORMALISE and NORMALISE# establish
-;;; the order of argument normalisation independent of how *they*
-;;; are normalised.  Thus the following 4 cases print "AB", "BA",
-;;; "AB", and "BA", respectively.  This shows that the 3Lisp RPP
-;;; enforces left-to-right argument processing (rather than merely
-;;; absorbing it from levels above).
-
-;;; JL: add ' before the inner call to normalise... for the last 3 cases
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; BCS: Note that the definitions of NORMALISE and NORMALISE# establish
+;      the order of argument normalisation independent of how *they*
+;      are normalised.  Thus the following 4 cases print "AB", "BA",
+;      "AB", and "BA", respectively.  This shows that the 3Lisp RPP
+;      enforces left-to-right argument processing (rather than merely
+;      absorbing it from levels above).
 
 (normalise
   '(normalise
-     '[(block (print 'A) (+ 2 3))
-       (block (print 'B) (* 2 3))]
+     '[(block (println 'A) (+ 2 3))
+       (block (println 'B) (* 2 3))]
      global
      id)
   global
@@ -1425,8 +1420,8 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 
 (normalise
   '(normalise#
-    '[(block# (print 'A) (+ 2 3))
-      (block# (print 'B) (* 2 3))]
+    '[(block# (println 'A) (+ 2 3))
+      (block# (println 'B) (* 2 3))]
     global
     id)
   global
@@ -1434,8 +1429,8 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 
 (normalise#
   '(normalise
-    '[(block (print 'A) (+ 2 3))
-      (block (print 'B) (* 2 3))]
+    '[(block (println 'A) (+ 2 3))
+      (block (println 'B) (* 2 3))]
     global
     id)
   global
@@ -1443,20 +1438,21 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 
 (normalise#
   '(normalise#
-    '[(block# (print 'A) (+ 2 3))
-      (block# (print 'B) (* 2 3))]
+    '[(block# (println 'A) (+ 2 3))
+      (block# (println 'B) (* 2 3))]
     global
     id)
   global
   id)
 
-
-;;; JL: The following test-cases, would test order of argument normalization directly
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; JL: The following test-cases, would test order of argument normalization directly
 
 (normalise  '(+ (block  (print 'A) 2) (block  (print 'B) 3)) global id)
 (normalise# '(+ (block# (print 'A) 2) (block# (print 'B) 3)) global id)
 
-;;; JL: Test cases for interaction (or lack thereof) of normalise? and block? ...
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; JL: Test cases for interaction (or lack thereof) of normalise? and block? ...
 
 (normalise  '(block   (print 'A) (print 'B) 2) global id)
 (normalise# '(block#  (print 'A) (print 'B) 2) global id)
@@ -1468,7 +1464,7 @@ x                       ; => '(= (TYPE EXP) 'ATOM)
 ;(define BLOCK
 ;  (lambda reflect [clauses env cont]
 ;    (if (unit clauses)
-;		 (normalise (1st clauses) env cont)
+;	     	 (normalise (1st clauses) env cont)
 ;        (normalise (1st clauses) env
 ;          (lambda simple arg                      ; BLOCK continuation
 ;            (normalise (pcons 'block (rest clauses)) env cont)))) 
