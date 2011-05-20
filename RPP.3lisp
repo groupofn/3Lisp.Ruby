@@ -1,3 +1,15 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;                                  ;;;
+;;;   Ruby Implementation of 3Lisp   ;;;
+;;;                                  ;;;
+;;;          Version 1.00            ;;;
+;;;                                  ;;;
+;;;           2011-05-20             ;;;
+;;;           Group of N             ;;;
+;;;                                  ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ;;;;;; the 3-Lisp Reflective Processor Program  ;;;;;;
 
 (define READ-NORMALISE-PRINT

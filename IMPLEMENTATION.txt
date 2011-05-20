@@ -1,8 +1,12 @@
+                      Notes on 3LispR Design and Implementation
+
+
+This is as yet a super drafty bunch of notes. Will work them into a more readable form in the next couple of days. -Jun
+
 ↓↑
 
 [ ] The nasty test cases from the manual
 
-                      Notes on 3LispR Design and Implementation
 
 I. Divergence of 3LispR from 3LispM
                               

@@ -44,7 +44,7 @@ class ExpReader
         c = c + STDIN.getc.chr 
       } 
       # wait just long enough for the escape sequence to get swallowed 
-      extra_thread.join(0.001)
+      extra_thread.join(0.002)
       # kill thread so not-so-long escape sequences don't wait on getc 
       extra_thread.kill
     end

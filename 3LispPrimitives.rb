@@ -41,7 +41,8 @@ class ThreeLispPrimitives
     [
       [:EXIT, :SIMPLE, Rail.new, lambda {|args| Process.exit }],
       [:ERROR, :SIMPLE, Rail.new(:struc), lambda{|args|
-        raise_error(self, "3-Lisp run-time error: " + args.first.to_s + "\n") }],
+        raise_error(self, "ERROR expects a string") if args.length != 1
+        raise_error(self, args.first) }],
       [:LEVEL, :SIMPLE, Rail.new, lambda {|args| @IPP.level }],
                 
       [:SYS, :SIMPLE, Rail.new(:command, :arguments), lambda{|args|
