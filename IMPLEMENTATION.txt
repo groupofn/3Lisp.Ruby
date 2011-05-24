@@ -1,111 +1,109 @@
-                      Notes on 3LispR Design and Implementation
+                                      Notes on 3LispR Design and Implementation
+
+                                                    2011-05-24
+                                         
+                                                     Jun Luo
+                                            
+                                                       of
+                                                 The Group of N
+           
+    
+In the following discussion, I will use "3LispM" to name 3Lisp as defined in the Interim 3-Lisp Reference Manual
+and use "3LispR" to name 3Lisp as implemented here in Ruby. The deviations of 3LispR from 3LispM are overall minor
+and of only limited architectural implications. They are not big enough to constitute 3LispR as a new dialect of 
+3Lisp. It is nevertheless important to document them, especially if further experimentation and development towards
+3.nLisp or 4Lisp is to use 3LispR as a tool.
+
+Following the "implementation paper" (des Riviers and Smith 1984), I will use these abbreviations: IPP (Implementation
+Processor Program) and RPP (Reflective Processor Program).
 
 
-This is as yet a super drafty bunch of notes. Will work them into a more readable form in the next couple of days. -Jun
 
-↓↑
+1. Relativization of Level Numbering
 
-[ ] The nasty test cases from the manual
+3LispM takes the level of initial interaction with the user to be level 1. Thus, when 3LispM starts, the user will 
+encounter this prompt:
 
-
-I. Divergence of 3LispR from 3LispM
-                              
-In the following discussion, I will use "3LispM" to name 3Lisp as defined in 
-the Interim 3-Lisp Reference Manual and use "3LispR" to name 3Lisp as 
-implemented here in Ruby. The deviations of 3LispR from 3LispM are overall 
-minor and of limited architectural implications. They are not big enough to
-constitute 3LispR as a new dialect of 3Lisp. It is nevertheless important
-to document them, especially if further development of 3Lisp towards 3.nLisp
-or 4Lisp is to use 3LispR for trying things out.
-
-IPP = Implementation Processor Program
-RPP = Reflective Processor Program
-
-
-0. Relativization of Level Numbering
-
-3LispM takes the level at which initial interaction with the user starts to
-be level 1. Thus, when 3LispM starts, the user will encounter this prompt:
-
-M:
         1> 
     
-at which they could enter 3Lisp expressions. The "1> " prompt is an
-invitation, as it were, issued by the level-1 processor to the user to
-talk to it. Assuming no reflection is involved, the expression entered by 
-the user will then run at level 0 or be run by the level-1 processor.
+at which they could enter 3Lisp expressions. The "1> " prompt is an invitation, as it were, issued by the level-2 
+processor to the user to talk to it. I will call it the "read prompt". Assuming no reflection is involved, the 
+expression entered by the user at the prompt will then run at level 1, i.e., it will be run by the level-2 processor, 
+and the result will be given back at the prompt:
 
-Under the conception of an infinite tower, this is in turn understood as
-resulted from an infinite sequence of READ-NORMALISE-PRINT interactions:
+        1> (+ 1 1)
+        1= 2
 
-M:
-        .
-        .
-        .
+I will call "1= " the "reply prompt". 
 
-        4> (read-normalise-print 3 global)
-        3> (read-normalise-print 2 global)
-        2> (read-normalise-print 1 global)
-        1>
+Under the conception of the infinite tower, what supposedly sets up for this interaction at level 1 is an infinite 
+sequence of invocations (by whom?) of READ-NORMALISE-PRINT, in the following fashion (p.18 of Manual):
+        
+        god> (READ-NORMALISE-PRINT ∞ global) 
+        ∞> (READ-NORMALISE-PRINT ∞-1 global)
+        ∞-1> (READ-NORMALISE-PRINT ∞-2 global)
+                .
+                .
+                .
+        3> (READ-NORMALISE-PRINT 2 global)
+        2> (READ-NORMALISE-PRINT 1 global)
+        1> 
+        
+This is all pretty good, except that if the tower extends infinitely upwards, it does not seem to make sense to say 
+that the READ-NORMALISE-PRINT iteration has a beginning at level ∞. Being at ∞ -- if it makes sense to say that -- is 
+a way of not being at any definite level. After all, if ∞-1 and ∞ are (transfinite?) numbers, they are equal to each 
+other. Therefore, that the last call to READ-NORMALISE-PRINT has 1 as its level argument is not because it is one more 
+level further down from the "top" than the second-last call to READ-NORMALISE-PRINT with 2. 
 
-This is all very good, except that if the tower extends infinitely 
-upwards, or comes from an infinitely higher level of ∞, it does not 
-make much sense to say that the READ-NORMALISE-PRINT iteration 
-definitely stops at level 1. That the last call
-to READ-NORMALISE-PRINT has 1 as its level argument is not because
-it is one more level further down from the "top" than the call
-to READ-NORMALISE-PRINT with 2. I.e., there is no difference in 
-∞+1 and ∞. In other words, it really does not matter where in the 
-tower one stops. So long as it is a definite level. And the 
-definiteness does not come from the distance to the TOP, or even
-the ordering. This is so especially the tower could also be extended
-downwards indefinitely.
+What really matters about "1> " is not that it is exactly ∞ levels away from God, but rather that it is the level at
+which interaction is going to take place, that it is the last one and the one above it is the second-last one. What 
+matters about this level 1 is its definiteness that is required for actual interaction. I.e. it is where *the* level
+at which actual interaction is going to take place. This is so especially if the tower could also be extended downwards 
+indefinitely, if not also infinitely as with the upward direction. In such an upwoardly infinite tower, "distance from 
+God" is not available for differentiating the levels.
 
-What 3LispR does regarding this issue is that it numbers the level
-at which interaction happens not absolutely, but rather relatively.
-It uses 0 to indicate whichever level of processor that is currently
-handling the business. Thus, the conception is that at the startup,
-a random level in the infinite tower is chosen as the level where 
-the user is going to start interacting with the tower. 
+It seems to me that the "origin myth" of the tower, where God figures at the top of some sort, fails to address the 
+origin of the definiteness of the level at which initial interaction takes place.
 
-If we want, we could say that it is the user's "being there" or
-"deixis" with regard to this infinite tower that gives brings the 
-definiteness into the picture. What this does is that it magically
-"intercepts" that READ-NORMALISE-PRINT sequence. 
+In contrast to 3LispM, 3LispR numbers the levels not absolutely, but relatively. It uses 0 for the level at which initial
+interaction takes place, i.e. the level at which user programs will run initially. The levels above or below level 0 
+are numbered respectively with positive or negative numbers, the absolute value of which corresponds to how many levels 
+apart they are, relatively, from level 0. In accordance to this relativized level numbering, level number no longer needs 
+to be explicitly given when calling READ-NORMALISE-PRINT, so long as the IPP keeps track of how many levels off from 
+the initial and in which direction the current level is, the relativized number could be used in the prompt. (See next 
+section for more detail about how 3LispR treats the prompt.)
+
+Compatible with relative numbering of levels, we could tell an alternative origin myth about the tower:
+
+        Since time immemorial, a demiurge has been tirelessly creating levels of the 3Lisp tower in its
+        programming workshop. We do not know where, how, and when the demiurge started this tower. We just 
+        konw that it is still adding levels to it. Whenever we want to tap into that tower, we just run a 
+        special program  (e.g. "ruby 3Lisp.rb"). This program functions as a portal into the demiurge's 
+        programming workshop. Running it allows us to effectively take control of extension of the tower, 
+        suspend it, send the demiurge to rest, and then do what we want at this current level which the 
+        demiurge just finished creating when its work is suspended. 
  
- [Alternative "origin myth"]
- 
-Under this conception, level number starts with 0 and changes into
-either positive or negative as one moves up or down the tower from
-the initial level, with absolute value of the level number indicates 
-how many levels away from the initial level.
-
-In accordance to this relativized level numbering, level number no
-longer needs to be explicitly given when calling READ-NORMALISE-PRINT,
-so long as the IPP keeps track of how many levels off from the initial
-and in which direction, then the relativized number could be used
-in the prompt. 
+Under this alternative myth, we could say that it is the user's "being there at" or "deictic reach into" the demiurge's
+workshop through runnning the special program that brings the definiteness into the picture: level 0 is just the level 
+at which the tower construction of the demiurge is magically "intercepted" by our request to interact with the tower; 
+it is the level at which we are going to start interacting with the tower. 
 
 
-1. Prompt
+
+2. Prompt
 
 In 3LispM, the interactive prompt usually looks like the following:
 
-M:
         1> (+ 1 1)
         1= 2 
 
-In this example, the prompt for reading is "1> " and the prompt of reply or 
-result is "1= ", respective produced by PROMPT&READ and PROMPT&REPLY. 
-The prompt consists of 2 parts, a numeral for the level at which interaction
-is taking place, '1' in this case,  and a short string, either "> " or "= ",
-indicating respectively reading or replying.
+The read prompt "1> " and reply prompt "1= " are respectively produced by PROMPT&READ and PROMPT&REPLY. Each prompt 
+consists of 2 parts, a numeral for the level at which interaction is taking place, '1' in this case, and a short string, 
+either "> " or "= ", indicating respectively reading or replying.
 
-READ-NORMALISE-PRINT, in turn, specifies a level when calling PROMPT&READ 
-and PROMPT&REPLY:
+READ-NORMALISE-PRINT, in turn, has a "level" argument, which is used when calling PROMPT&READ and PROMPT&REPLY:
 
-M:
-        (define READ-NORMALISE-PRINT
+        (define READ-NORMALISE-PRINT                         ; 3LispM version
           (lambda simple [level env]
             (normalise (prompt&read level) env
               (lambda simple [result]
@@ -113,58 +111,63 @@ M:
                   (prompt&reply result level)
                   (read-normalise-print level env))))))
               
-This allows arbitrary level number be specified when calling 
-READ-NORMALISE-PRINT:
+This design allows an arbitrary number be used as the "level" argument in a call to READ-NORMALISE-PRINT:
 
-M:
-        1> (read-normalise-print 2001 global)
+        1> (read-normalise-print 2001 global)                ; 3LispM version
         2001> 
 
-In 3LispR the treatment differs. First, level number is now 
-differentiated from prompt text. Rather than supplying READ-NORMALISE-PRINT
-with a level number, the relativized level number is now available through
-primiitve access to the IPP state. And this level number could
-be used in the prompt through an READ and PRINT discussed below.
+The treatment of prompt in 3LispR differs in a couple of ways. First, level number is differentiated from prompt text. 
+Rather than supplying READ-NORMALISE-PRINT with a level number, the relativized level number (see Section 1) is now part of
+the IPP state. And this level number could be used in the prompt through an appropriate call to READ and PRINT, which are
+discussed in the next section.
 
-Second, rather than READ-NORMALISE-PRINT taking level number as an argument,
-it takes two arguments of the string type, which supplies short descriptive
-texts that will be used in respectively the READ prompt and the PRINT prompt.
-This could be as simple as:
+Second, rather than taking level number as an argument, READ-NORMALISE-PRINT takes two arguments of the string type, which 
+supplies short descriptive texts that are used in respectively the read prompt and the reply prompt. Such descriptive text
+could be simple signs such as the familiar " > " and " = " or much more loquacious:
 
-R:
-      0 > (read-normalise-print " > "  " = " global)
-      -1 > (+ 1 1)
-      -1 = 2
-      -1 > (define quit (lambda reflect [args cont env] 'done))
-      -1 = 'QUIT
-      -1 > (quit)
-      0 = 'DONE
-      0 > (quit)
-      +1 = 'DONE
-      +1 > (quit)
-      +2 = 'DONE
-      +2 > (read-normalise-print " your question: "  " my answer: " global) 
-      +1 your question: (primitive ↑quit)
-      +1 my answer: $F
-      +1 your question: 
+        0 > (read-normalise-print " > "  " = " global)       ; 3LispR version
+        -1 > (+ 1 1)
+        -1 = 2
+        -1 > (define quit (lambda reflect [args cont env] 'done))
+        -1 = 'QUIT
+        -1 > (quit)
+        0 = 'DONE
+        0 > (quit)
+        +1 = 'DONE
+        +1 > (quit)
+        +2 = 'DONE
+        +2 > (read-normalise-print " your question please: "  " here is my answer: " global) 
+        +1 your question please: (primitive ↑quit)
+        +1 here is my answer: $F
+        +1 your question please: (quit)
+        +2 = 'DONE
+        +2 >
+        
+Accordingly, READ-NORMALISE-PRINT is defined as follows
 
-and accordingly, READ-NORMALISE-PRINT is defined as follows
-
-R:
-        (define READ-NORMALISE-PRINT
+        (define READ-NORMALISE-PRINT                         ; 3LispR version
           (lambda simple [read-prompt reply-prompt env]
             (normalise (prompt&read read-prompt) env
               (lambda simple [result]
                 (block
                   (prompt&reply result reply-prompt)
                   (read-normalise-print read-prompt reply-prompt env))))))
+                  
+Third, in 3LispR the (relativized) level number is explicitly tracked as part of the IPP state at any moment (and differentiated 
+from the stack of continuations), rather than being embedded in the REPLY-CONTINUATION closures as how level number is handled
+in 3LispM. In 3LispR, what gets embedded in the REPLY-CONTINUATION closures are the descriptive texts for the read and reply 
+prompts, which could be level specific, as illustrated above.
+                  
+Finally, it is probably worth noting that to ensure that the level numbers are correctly displayed as part of the READ PROMPT, 
+not only are calls to READ-NORMALISE-PRINT now trapped, a shift-down is also performed upon such a call, just as in the case of 
+a call to NORMALISE.
 
-2. READ and PRINT
 
-Coordinated with the above treatment of Prompt, the primitive READ and PRINT
-now could take some extra arguments that control the Prompt. 
 
-By default, READ and PRINT are used in the following way:
+3. READ and PRINT
+
+Coordinated with the above treatment of Prompt, the primitives READ and PRINT now could take some extra arguments that control 
+the Prompt. By default, READ and PRINT are used in the following way:
 
         (READ) 
 
@@ -172,39 +175,43 @@ and
 
         (PRINT structure)
 
-The first extra argument is a boolean flag. It controls the display of relative level number
-as part of the prompt could be turned on or off. The default is off.  The second extra argument is a string that is used in the prompt. When level number is 
-displayed, this string follows the level number. 
+The first extra argument is a boolean flag. It turns on or off the display of the relative level number as part of the prompt. 
+The default is off. The second extra argument is a (descriptive) string that is used in the prompt. If display of level number 
+is on, this string follows the level number. 
 
 Thus,
 
         (READ $F " DEBUG > ")
         
-would suppress the level number and displays " DEBUG > " as the prompt; 
+would suppress the level number and displays " DEBUG > " as the prompt. In contrast, 
 
         (PRINT $T " DEBUG > ")
 
-in contrast would display the level number before " DEBUG > ".
+would display the level number before " DEBUG > ". Their use are illustrated below:
 
         0 > (block (print (read $F " EXAMPLE > ") $T " EXAMPLE = ") (newline))
          EXAMPLE > (+ 1 2)
         0 EXAMPLE = (+ 1 2)
         0 = 'OK
 
+PROMPT&READ and PROMPT&REPLY could be easily defined using this version of READ and PRINT.
 
-3. Environment
+ 
 
-Like Closure in 3LispM and 3LispR, Environment is a normal form in 3LispR. Accordingly, besides the
-traditional BINDING, REBIND, and BIND, which are the same interface as in 3LispM, we have the following
-primitives: ECONS, BOUND, and BOUND-ATOMS.
+4. Environment
 
-ECONS takes no arguments and constructs a so far inaccessible Environment structure:
+4.1 Enivronment as normal form
+
+Rather than using rails, environment is now a normal form in 3LispR. Accordingly, besides the traditional BINDING, REBIND, and 
+BIND, which have the same interface as in 3LispM but are now primitives, we have the following new primitives: ECONS, BOUND, and 
+BOUND-ATOMS.
+
+ECONS takes no arguments and constructs a so far inaccessible environment structure:
 
         0 > (econs)
         0 = #<Environment:8856540>
 
-This structure may be then manipulated with REBIND and BIND. BOUND tests whether a given atom is bound
-in a given environment:
+This structure may be then manipulated with REBIND and BIND. BOUND tests whether a given atom is bound in a given environment:
 
         0 > (set env (econs))
         0 = 'OK
@@ -224,38 +231,213 @@ BOUND-ATOMS lists all atoms bound in the given environment. To continue the abov
         0 > (bound-atoms env)
         0 = ['A 'B]
 
-Moreover, ENVIRONMENT now names the characteristic function for environment structures rather than an
-accessor of the environment structure embedded in a closure. For that we have ENVIRONMENT-OF instead:
+Moreover, ENVIRONMENT now names the characteristic function for environment structures rather than an accessor of the environment 
+structure enclosued in a closure. For that we have ENVIRONMENT-OF instead:
 
         0 > (environment ↑env)
         0 = $T
         0 > (environment-of ↑select)
         0 = #<Environment:4259878>
 
+Finally, we use "environment" to name the 3LispR environment structure and take an environment structure to designate the 
+"bindings", i.e. the association relations between atoms and entities:
 
-4. Strings and Characters
+        0 > (type (econs))
+        0 = 'BINDINGS
+        0 > (type ↑(econs))
+        0 = 'ENVIRONMENT
+        
+        
+4.2 Literal environment construction? 
 
-3LispM has a basic structural type called "Charat", the instances of which designates
-individual characters and rails of Charats in turn design strings, which are taken to be sequences of 
-characters. Under this scheme, string manipulations could be implemented on the basis of rail 
-operations.
+One issue concerning this change of the implementation of environment is whether we still want to have a literal way of constructing
+environments in 3Lisp programs. In 3LispM, one could simply write 
 
-3LispR could have followed this route. However, things are kept simple for now by leaving out the
-Charat type and implementing the string type only as atomic structural elements. Thus, one can use a
-string literal: "abc", or "Beatrice Potter". Atoms may also be bound to strings. But there is no 
-operations such as string concatenation, string matching etc. Down the road, if it turns out to be
-desireable, we could easily expose a set of Ruby's string operations as 3LispR primitives.
+        [['a '1] ['b '2] ['c '3]]
+        
+which is a literal way of constructing a rail of rails and what is constructed could be used as an environment structure. To get the 
+same thing in 3LispR one will have to write something that is much less conspicuous:
 
-The decision is made partly because Ruby does not have a character or Charat type, but has only strings. 
-There is of course nothing prevent us from building a Charat type on top of Ruby's string and then 
-treat strings as sequences of characters. But that would be a truly round-about way of getting something
-unwieldy, especially because Ruby's string operations seem already slow, 
+        (bind 'a '1 (bind 'b '2 (bind 'c '3 (econs))))
 
-But of course we do not really have much of a rationale to determine which design decision is the more
-sensible. Further development of 3Lisp into 3.nLisp might help supply this. For now, we are keeping
-things simple.
+If a literal way of environment construction is truly desirable, the following might be a way of doing it:
 
-Finally, I should note that rather than implementing a separate PRINT-STRING utility, I've opted to 
+        <<'a '1> <'b '2> <'c '3>>
+
+This would overload '<' and '>' in their role of reserved characters, forcing the parser to look ahead by at least one more 
+non-space characters, but that should be fine.
+
+
+
+5. Closure
+
+The biggest meaningful divergence of 3LispR from the implementation paper is probably that of closure implementation. The 
+motivation is to both streamline closure identification and protect the kernel closures from being smashed. 
+
+
+5.1 Identification
+
+All closures in 3LispR has a special "system-type" tag that is inaccessible from 3Lisp. This tag marks up a closure as a PPP 
+(Primary Processor Procedure), PPC (Primary Processor Continuation), a primitive, a kernel utility, or an ordinary one. Moreover, 
+for the closures of the first four kinds, its system-name is stored in the closure Ruby structure, again inaccessible from 3Lisp. 
+Under the assumption that kernel procedures (including PPP, PPC, and kernel utility) and primitives cannot be smashed from 
+within 3Lisp programs (see caveat below), the identification of any particular PPP or PPC during the running of the IPP 
+is a matter of checking their system-type and their system-name.
+ 
+This design eleminates the need of recursively comparing elements of a closure in an attempt to identify it as a certain PPP or 
+PPC.
+
+
+5.2 Protection of kernel and primitives
+
+Two kinds of protection are necessary. One against smashing of a kernel or primitive closure structure through REPLACE and 
+another against the rebinding of the name of a kernel function in the global environment through REBIND. Accordingly, the 
+implementation of the REPLACE and REBND primitives check to make sure that the closure being altered is not a kernel or a 
+primitive.
+
+The name "GLOBAL" is similarly protected in the global environment. "PRIMITIVE-CLOSURES" is no longer bound to the set of 
+primitive closures after the initialization of the IPP. The predicate PRIMITIVE is now instead a primitive, which directly 
+tests the system-type tag of a closure, rather than looking it up in the set of primitive closures.
+
+It must be noted that the protection of kernel and primitive closures against REPLACE is incomplete. It only works at the top
+level of closure construction. Thus, for example, a 3Lisp program could retrieve the body of a closure, and then REPLACE the
+CAR or CDR of that body, and thereby indirectly alters the closure by altering its elements.
+
+
+5.3 Towards proper names
+
+It seems to me that the 3LispR closure implementation could provide some of the needed support if we decide to introduce proper 
+names into 3.nLisp and treat the names of kernels and primitives as proper.
+
+
+
+6. Rail
+
+The implementation of rails in 3LispR changed many times. It started out as a direct extension of Ruby's Array type. It then
+came to use Ruby's Array type as a delegate. The "problem" with these implementation choices is that they do not (easily or 
+naturally) support shared tails of rails, which is a feature of 3LispM. (Actually, I am not convinced this is a problem because 
+I am still not sure about the general merit or utility of shared tails beyond making environment implementation in rails easy.) 
+After these, rails came to be implemented as containers of linked list in another version of 3LispR, which supported all rail 
+operations in 3LispM, before finally being implemented on the basis of the Ruby class implementing 3Lisp pairs. 
+
+In the currently final implemention, shared tails are still allowed as well as mutation of an element and concatenating one
+rail to the *end* of another. Mutation of tails is in general forbidden, however. 
+
+The motivation for this decision is efficiency. By banning mutation of tails, it is possible to keep track of the length of a 
+rail as well as its last element as rails are created, combined, or recombined, which in turn means LENGTH and a few other 
+operations requires no traversing of the whole rail but could happen in constant time. 
+
+There are some curiosities with this design. For example shared tails and circular structures could still be formed, leading
+to situations potentially very confusing:
+
+        0 > (set r [1 2 3])
+        0 = 'OK
+        0 > (concatenate ↑r ↑r)
+        0 = '[1 2 3 1 2 3]
+        0 > (rplacn 2 ↑r '20)
+        0 = 'OK
+        0 > r
+        0 = [1 20 3 1 20 3]
+        0 > (length r)
+        0 = 6
+ 
+     
+
+7. REPLACE and Structural Identity
+
+The implementation of REPLACE in 3LispR is at best half-hearted in contrast that in 3LispM. First, as mentioned above, REPLACE 
+does not support the mutation of tails of rails. (CONCATENATE, however, does mutate the tail of a rail, but only by extending 
+the very end of a rail.)  
+
+Second, REPLACE of atoms, which is supported in 3LispM, is not supported in 3LispR. The immediate reason for this is because
+atoms are implemented using Ruby's Symbol, which cannot be changed without changing the Ruby object's identity. Then one also
+wonders "why bother?"
+
+Third, while environment is a normal form in 3LispR, REPLACE does not work with environment. This is probably OK, because
+mutation of environment structure is done through the standard utilties such as BIND and REBIND.
+
+In sum, REPLACE only work for closures and pairs. The individual elements of rails (via RPLACN, which is provided primitively)
+and environment structures maybe changed with other special primitives.
+
+I am actually not too sure whether such a situation with REPLACE is happy or unhappy. This is because I am not too sure about
+the general status of REPLACE in the first place.
+
+What I feel might be going on is that REPLACE is occasionally useful beyond a reflective version of SET could offer, such as
+in the definition of the Y-OPERATOR:
+
+        (define Y-OPERATOR                       ; 3LispM & 3LispR
+          (lambda simple [fun]
+            (let [[temp (lambda simple ? ?)]]
+              (block (replace ↑temp ↑(fun temp)) temp))))
+      
+and similarly in the definition of PUSH and POP:
+
+        (define PUSH                             ; 3LispM only
+          (lambda simple [element stack]
+            (replace ↑stack
+                     ↑(prep element
+                            (if (empty stack)
+                                (scons)
+                                (prep (1st stack) (rest stack)))))))
+                        
+        (define POP                              ; 3LispM only
+          (lambda simple [stack]
+           (let [[top (1st stack)]]
+              (block
+                (replace ↑stack ↑(rest stack))
+                top))))
+
+These are good. 
+
+But I also wonder whether REPLACE represents a way of messing with 3Lisp structures in which their structural identity, as versus
+their referential equality (or co-referentiality, what '=' tests), actually matters in the effects or even semantics of the 
+procedures involved. That REPLACE is provided as a primitive in 3LispM seems to suggest that something like this is what is going 
+on. But then it also raises some questions:
+
+        Was REPLACE designed to cover a dark corner not under the scope of the 3Lisp model that the 3LispM RPP
+        is based on? If a fuller version and model of 3Lisp is to enable reflection into the REPLACE business,
+        must that version of 3Lisp support structural identity? Does the situation here reflects a general
+        inadequacy of 3Lisp in dealing with side-effect? Or is that inadequacy really an issue with names such 
+        that by introducing names into the 3.nLisp, it would be eased? 
+        
+        
+
+8. Streams
+
+There is a stream type in 3LispM. This is not supported in 3LispR. This is because no constructor of streams is actually defined
+for 3LispM. And there is no account given as to which streams are provided to user programs by the 3Lisp environment besides what
+is called the PRIMARY-STREAM. It may be the case that some sort of mapping between the UNIX standard streams (stdin, stdout, and 
+stderr) to some named streams in 3Lisp is assumed. But I did not find any information about this. Thus, for now I opted to keep 
+things simple by leaving out all stream arguments from the primitives and procedures and absorb Ruby's STDIN, STDOUT and STDERR 
+into the context of 3Lisp calls to READ, PRINT, or Error respectively.
+
+
+
+9. Strings and Characters
+
+In 3LispM, instances of a basic structural type called "Charat" designate individual characters; rails of Charats in turn 
+designate strings, which are taken to be sequences of characters. Under this scheme, string manipulations could be implemented on 
+the basis of rail operations. This is for sure elegant.
+
+3LispR could have followed this route. However, things are kept simple for now by leaving out the Charat type and implementing the
+string type as atomic structural elements. Thus, one can use a string literal such as "abc" and "Beatrice Potter", or even "there
+
+
+are three newlines in this string". Atoms may also be bound to strings. No operations such as string concatenation, string 
+matching etc that treats strings non-atomically are supported. Down the road, if it turns out to be desireable, we could easily 
+expose a set of Ruby's string operations as 3LispR's string primitives.
+
+This approach of directly basing the string type on Ruby's corresponding type, rather than basing string structures on top of 
+Charat and Rail, certainly makes string implementation exceedingly simple. This is also the natural thing to do because Ruby does 
+not have a character or Charat type, but has only strings. Nothing prevent us from building a Charat type on top of Ruby's string 
+and then treat strings as sequences of characters. But that would be a truly round-about way of getting something unwieldy, 
+especially because Ruby's string operations seem already slow. 
+
+Here, we do not really have much of a rationale other than efficiency and implementation simplicity to determine which design 
+decision is the more sensible. Further development of 3Lisp into 3.nLisp might help supply this. For now, we are keeping things 
+simple.
+
+Finally, I should note that rather than implementing a separate PRINT-STRING utility as in 3LIspM, I have opted to 
 allow PRINT to accept string arguments and perform a "disquotation" operation on the structure supplied:
 
         0 > (block (print "Hello!") (newline))
@@ -269,100 +451,3 @@ My understanding is that this is in agreement with the general dereference desig
         0 > (block (print '1) (newline))
         1
         0 = 'OK
-
-5. EXIT, ERROR, LEVEL, SYS, SOURCE and PARSE 
-
-Half a dozen primitive utilities not in 3LispM are provided. Among these, 
-
-(1) EXIT simply terminates the running 3LispR IPP;
-
-(2) ERROR, which takes any 3LispR structure as argument, throws a "3-Lisp run-time error" exception 
-which leads the continuation since the last READ-NORMALISE-PRINT interaction being thrown away and
-control returns to the command prompt. How useful this one is and what it can do that cannot be done
-by the scheme-catch mechanism is yet to be seen.
-
-(3) LEVEL returns the relativized level numbers as currently tracked by the IPP. This is just a simple
-ilustration of how the state of the IPP may be accessed. Since most of the IPP state are already 
-reified Ruby structures that implements 3Lisp structures, it wouldn't be too hard to provide more access
-to the IPP. What the implications are, however, remain unclear.
-
-(4) SYS is a utility for invoking operation system's commands. It takes one or more strings as its arguments. 
-The strings are then concatenated together, with separating ' ' character to form a shell command, which is 
-then executed by the operating system. The allowance of arbitrary positive number of string arguments is to enable 
-combination of system commands and arguments.
-
-This utility is only for its side effect on the operation system, espcially the file system environment. It is 
-sometimes useful for the user to do such things without leaving a running 3LispR instance.
-
-(5) SOURCE takes a string argument which is the path of a text file and raeds in the file's content and 
-returns it as a 3LispR string. designates a file available.
-
-(6) PARSE takes a string argument, treats it as expression of 3Lisp Structures and returns the internalised
-3Lisp structure.
-
-
-II. Divergence from the Implementation Paper
-
-
-1. Tracking of level
-
-In 3LispR, The relativized level number is  explicitly tracked as part of the IPP state, rather than embedded in 
-the REPLY-CONTINUATION constructed as in 3LispM. What's embedded in the REPLY-CONTINUATION are the read and reply
-prompts.
-
-2. State management
-
-This is largely the same as the implementation paper, except that the stack of continuation and the level are 
-explicitly differentiated.
-
-3. READ-NORMALISE-PRINT is trapped
-
-To ensure that the level numbers are correctly displayed, READ-NORMALISE-PRINT are now not only trapped, but also 
-shift-down is performed upon encountering one during EXPAND-CLOSURE. 
-
-4. Closure
-
-The greatest meaningful divergence of 3LispR from 3LispM is probably that of closure implementation.
-The motivation is to streamline closure identification and protect the kernel from being smashed. 
-
-4.1 Identification
-
-All closures now has a special tag that is inaccessible from 3Lisp. This tag marks the system-type of a closure,
-as either PPP, PPC, Primitive, KernelUtility or Ordinary. Moreover, for the first four kinds, a system-internal name 
-is stored, again inaccessible from 3Lisp. Under the assumption that kernel (including PPP, PPC, and KernelUtility) 
-and Primitives cannot be smashed by 3Lisp programs, the identification of any particular PPP or PPC during the running
- of the IPP is a matter of checking their system-type and their system-internal name.
- 
-This eleminated the needs of recursively comparing elements of a closure in an attempt to identifying it as a
-certain PPP or PPC.
-
-
-4.2 Protection of kernel and primitives
-
-Two kinds of protection are necessary. One against smashing of a kernel or primitive closure structure through REPLACE 
-and another against the rebinding of the name of a kernel function in the global environment through REBIND. Accordingly,
-the implementation of the REPLACE and REBND primitives check to make sure that the closure being altered is not a kernel
-or a primitive.
-
-The name "global" is similarly protected in the global environment. "primitive-closures" however is not, because it is
-no longer bound to the set of primitive closures after the start of the IPP. The predicate PRIMITIVE is now instead
-a primitive.
-
-4.3 Toward proper names
-
-It seems to me that such a set up could provide some of the needed support if we decide to introduce proper names
-into 3.nLisp and treat the names of kernels and primitives as proper names.
-
-5. Rail
-
-6. Streams
-
-; [-] I/O: NO support for streams for now. The Manual version has no CONS. It thus does not offer a useful, complete set.
-
-
-7. ; [x] REPLACE
-; => [x] REPLACE done for RAIL and PAIR
-; => [-] REPLACE not done for ATOM, because Ruby does not allow change of symbol, while retaining object identity. 
-; => [?] REPLACE could be trivially done for CLOSURE, but what's the point? 
-
- 
