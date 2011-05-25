@@ -346,31 +346,32 @@ to situations potentially very confusing:
 7. REPLACE and Structural Identity
 
 The implementation of REPLACE in 3LispR is at best half-hearted in contrast that in 3LispM. First, as mentioned above, REPLACE 
-does not support the mutation of tails of rails. (CONCATENATE, however, does mutate the tail of a rail, but only by extending 
-the very end of a rail.)  
+does not support the mutation of tails of rails. (CONCATENATE, however, does mutate the tail of a rail, but only the very last
+tail -- or the "foot" -- of a rail.)  
 
 Second, REPLACE of atoms, which is supported in 3LispM, is not supported in 3LispR. The immediate reason for this is because
-atoms are implemented using Ruby's Symbol, which cannot be changed without changing the Ruby object's identity. Then one also
-wonders "why bother?"
+atoms are implemented using Ruby's Symbol, which cannot be changed without changing the identity of the Ruby Symbol instance. 
+One could of course implement atoms less directly on top of Ruby's Symbol, but then one also wonders "why bother?"
 
 Third, while environment is a normal form in 3LispR, REPLACE does not work with environment. This is probably OK, because
-mutation of environment structure is done through the standard utilties such as BIND and REBIND.
+mutation of environment structure is done through the standard utilties such as BIND and REBIND. But these are still limited
+because it does not allow destructive operations such as deleting individual atom-structure pairings from an environment.
 
-In sum, REPLACE only work for closures and pairs. The individual elements of rails (via RPLACN, which is provided primitively)
-and environment structures maybe changed with other special primitives.
+In sum, REPLACE only fully work for closures and pairs. The individual elements of rails (via RPLACN, which is provided 
+primitively) and environment structures may be changed with other special primitives.
 
 I am actually not too sure whether such a situation with REPLACE is happy or unhappy. This is because I am not too sure about
 the general status of REPLACE in the first place.
 
-What I feel might be going on is that REPLACE is occasionally useful beyond a reflective version of SET could offer, such as
-in the definition of the Y-OPERATOR:
+What I feel might be going on is that REPLACE is occasionally useful beyond what a reflective version of SET could offer.
+REPLACE, for example, allows the Y-OPERATOR to be defined:
 
         (define Y-OPERATOR                       ; 3LispM & 3LispR
           (lambda simple [fun]
             (let [[temp (lambda simple ? ?)]]
               (block (replace ↑temp ↑(fun temp)) temp))))
       
-and similarly in the definition of PUSH and POP:
+and similarly with PUSH and POP:
 
         (define PUSH                             ; 3LispM only
           (lambda simple [element stack]
@@ -389,17 +390,17 @@ and similarly in the definition of PUSH and POP:
 
 These are good. 
 
-But I also wonder whether REPLACE represents a way of messing with 3Lisp structures in which their structural identity, as versus
-their referential equality (or co-referentiality, what '=' tests), actually matters in the effects or even semantics of the 
-procedures involved. That REPLACE is provided as a primitive in 3LispM seems to suggest that something like this is what is going 
-on. But then it also raises some questions:
+But I also wonder what is the general rationale for the inclusion of REPLACE in 3Lisp. Is it a way of messing with 3Lisp 
+structures in which their structural identity, as versus their referential equality (or co-referentiality, what '=' tests), 
+actually matters in the effects or even semantics of the procedures involved? In other words, if SET alters reference and 
+establishes co-reference of atoms, then REPLACE treats a structure as persistent while altering. I.e. SET and REPLACE 
+represent two different kinds of side-effects. That REPLACE is provided as a primitive, along with REBIND, seems to suggest 
+that something like this is what is going on. But then it also raises some questions:
 
-        Was REPLACE designed to cover a dark corner not under the scope of the 3Lisp model that the 3LispM RPP
-        is based on? If a fuller version and model of 3Lisp is to enable reflection into the REPLACE business,
-        must that version of 3Lisp support structural identity? Does the situation here reflects a general
-        inadequacy of 3Lisp in dealing with side-effect? Or is that inadequacy really an issue with names such 
-        that by introducing names into the 3.nLisp, it would be eased? 
-        
+        Why isn't REPLACE similar to SET, which can be defined through a combination of REBIND and reflection? 
+        Does this mean REPLCE is designed to cover a dark corner not under the scope of the 3Lisp model or theory
+        on which the RPP is based? How are we to reflection into the REPLACE business? Does that mean reflection 
+        into the implementation?         
         
 
 8. Streams
