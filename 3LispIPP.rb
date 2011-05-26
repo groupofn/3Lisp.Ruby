@@ -29,7 +29,7 @@ class ThreeLispIPP
   attr_accessor :reader, :parser, :global_env, :primitives, :reserved_names  
 
   # state of the IPP
-  attr_accessor :cont_stack, :level, :cont, :env, :ipp_args, :ipp_proc, :read_prompt, :reply_prompt
+  attr_accessor :cont_stack, :level, :cont, :env, :ipp_args, :ipp_proc, :last_ipp_args, :read_prompt, :reply_prompt
 
   # utility
   attr_accessor :stopwatch 
@@ -58,11 +58,13 @@ class ThreeLispIPP
 
   def shift_down(continuation)
     self.level -= 1
+    # print "shifting down to "; puts level
     cont_stack.push(continuation) # cont_stack is roughly what's called "state" in the implementation paper
   end
 
   def shift_up()
     self.level += 1
+    # print "shifting up to "; puts level
     if cont_stack.empty?
       make_reply_continuation(INITIAL_READ_PROMPT, INITIAL_REPLY_PROMPT, global_env)
     else
@@ -112,6 +114,7 @@ class ThreeLispIPP
     begin	
     	self.ipp_proc = :"READ-NORMALISE-PRINT"
     	self.ipp_args = [] 	  # "arguments" passed among the && procs as an array; none to READ-NORMALISE-PRINT
+      self.last_ipp_args = nil
       self.env = global_env 
       self.cont = nil
     	
@@ -133,7 +136,7 @@ class ThreeLispIPP
         # by only a small fraction, around 3%.
 
         when :"CALL"						# f a
-          f = ipp_args[0]
+            f = ipp_args[0]
           a = ipp_args[1..-1]
           
           self.ipp_proc = f.ppc_type  
@@ -156,17 +159,19 @@ class ThreeLispIPP
 #            self.ipp_proc = :"CALL"
 #            next
 #          end
-          
-          if f.reflective?      # reflective as continuation
-            c = shift_up
-            e = c.extract(:ENV)
-            self.ipp_args = [f.body.up]
-            self.env = f.environment.bind_pattern(f.pattern.up, Rail.new(Rail.new(*a), e, c).up)
+
+          # continuation assumed to be simple when shifting down, returned out to be reflective
+          # chicken out -- see pp.89-90 of Manual 
+          if f.reflective?           
+            proc_bang = last_ipp_args[0]; args_bang = last_ipp_args[1]
+            self.last_ipp_args = nil
+            self.ipp_args = [proc_bang.down.body.up] # expand closure
+            self.env = proc_bang.down.environment.bind_pattern(proc_bang.down.pattern.up, args_bang)
             self.cont = shift_up
             self.ipp_proc = :"NORMALISE"
             next
           end
-          
+
           self.ipp_args = [f.body.up]
           self.env = f.environment.bind_pattern(f.pattern.up, Rail.new(*a).up)
           self.cont = shift_up 
@@ -254,6 +259,8 @@ class ThreeLispIPP
           proc_bang = ipp_args[0]; args_bang = ipp_args[1]
           
           if proc_bang.down.ppp_type == :"NORMALISE" && plausible_arguments_to_normalise?(args_bang)
+            # self.last_ipp_proc = :"NORMALISE" # no need to register ipp_proc, only NORMALISE is a concern
+            self.last_ipp_args = ipp_args
             shift_down(cont)
             self.ipp_args = [args_bang.first.down]
             self.env = args_bang.second.down
@@ -380,9 +387,9 @@ class ThreeLispIPP
         end
       end
     
-    rescue RuntimeError, ZeroDivisionError => detail
-      print "3-Lisp run-time error: " + detail.message + "\n" 
-      retry
+#    rescue RuntimeError, ZeroDivisionError => detail
+#      print "3-Lisp run-time error: " + detail.message + "\n" 
+#      retry
     rescue Errno::ENOENT, Errno::EACCES => detail
       print "3-Lisp IO error: " + detail.message + "\n"
       retry 

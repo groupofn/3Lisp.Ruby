@@ -72,7 +72,7 @@ public
     if pattern.atom_d?
       raise_error(self, "Pattern Matching: structure expected for the argument") if !args.handle?
       Environment.new({pattern.quoted => args.quoted}, self)	
-    else  
+    else
       new_bindings = bind_pattern_helper({}, pattern, args, 0, 0)
       Environment.new(new_bindings, self)
     end

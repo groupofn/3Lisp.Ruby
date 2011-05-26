@@ -1201,16 +1201,10 @@ b  ; => 10
 ; 3. Smashing a continuation. An implementation may not trust the procedure 
 ;    type of a continuation - it can be changed on the fly.
 
-; Should this be allowed to go through?
+(let [[dummy-id (lambda simple [x] x)]]
+  (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV)
 
 (let [[dummy-id (lambda simple [x] x)]]
-  (normalise `(id (replace ,↑↑dummy-id ↑quote)) global dummy-id))  ; => '(BINDING EXP ENV) ???
-
-; or 
-(set di (lambda simple [struct] struct)) 
-(normalise `(replace ↑di ↑quote) global di)
-
-(let [[dummy-id (lambda simple [x] (print ↑x))]]
   (normalise `(id (replace ,↑↑dummy-id ↑up)) global dummy-id))     ; => '''OK
 
 
