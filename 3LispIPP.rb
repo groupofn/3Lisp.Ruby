@@ -387,9 +387,9 @@ class ThreeLispIPP
         end
       end
     
-#    rescue RuntimeError, ZeroDivisionError => detail
-#      print "3-Lisp run-time error: " + detail.message + "\n" 
-#      retry
+    rescue RuntimeError, ZeroDivisionError => detail
+      print "3-Lisp run-time error: " + detail.message + "\n" 
+      retry
     rescue Errno::ENOENT, Errno::EACCES => detail
       print "3-Lisp IO error: " + detail.message + "\n"
       retry 

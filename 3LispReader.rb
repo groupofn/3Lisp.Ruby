@@ -39,19 +39,19 @@ class ExpReader
     c = STDIN.getc.chr 
     if (c=="\e")  # gather up to 3 characters of a special key or "escape" squences 
       extra_thread = Thread.new { 
-        c = c + STDIN.getc.chr 
-        c = c + STDIN.getc.chr 
-        c = c + STDIN.getc.chr 
+        while true
+          c << STDIN.getc.chr
+        end
       } 
       # wait just long enough for the escape sequence to get swallowed 
-      extra_thread.join(0.002)
+      extra_thread.join(0.01)
       # kill thread so not-so-long escape sequences don't wait on getc 
       extra_thread.kill
     end
     
     return c
   end
-
+    
   def pair_highlight #  highlight the one before @col_pos
     if @col_pos > 0 && @col_pos-1 < @comment_starts[@row_pos]
       ch = @lines[@row_pos][@col_pos-1]
@@ -65,8 +65,12 @@ class ExpReader
             if close_paren?(ch)
               rights.push(ch)
             elsif open_paren?(ch)
-              return false if !pair_match?(rights.pop, ch)
-              
+
+              if !pair_match?(rights.pop, ch)
+                print "\a" # warning: mismatch
+                return false;
+              end
+                
               if rights.empty?
                 print "\e7"   # save caret position
 

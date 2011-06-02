@@ -495,9 +495,15 @@
   (lambda reflect! [[exp! env!] env cont]
     (normalise ↓exp! ↓env! cont)))
 
+; Manual's version
+; 
+;(define MACRO-EXPANDER
+;(lambda simple [macro-closure]
+;↓(binding 'expander ↓(environment-designator ↑macro-closure))))
+
 (define MACRO-EXPANDER
   (lambda simple [macro-closure]
-    ↓(binding 'expander ↓(environment-designator ↑macro-closure))))
+    (binding 'expander ↓(environment-designator macro-closure))))
 
 (define ID (lambda simple [x] x))
 

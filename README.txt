@@ -9,17 +9,17 @@
                                         The Group of N
                            
 The package includes a BETA version of a Ruby implementation of 3Lisp. The implementation follows the design 
-in des Riviers & Smith (1984) and largely conforms to 3Lisp as specified in the Interim 3-Lisp Reference 
-Manual. For convenience, we will call this 3Lisp Ruby implementation "3LispR", prounced "three-lisper". 
+in des Rivières & Smith (1984) and largely conforms to 3Lisp as specified in the Interim 3-Lisp Reference 
+Manual. For convenience, we will call this 3Lisp Ruby implementation "3LispR", pronounced "three-lisper". 
 
 
 
 1. Install Ruby 1.9
 
-3LispR requries Ruby 1.9.1 and above. The preinstalled version of Ruby that comes with Snow Leopard is 1.8.7. 
+3LispR requires Ruby 1.9.1 and above. The preinstalled version of Ruby that comes with Snow Leopard is 1.8.7. 
 We thus need to download and set up Ruby 1.9.x. 
 
-Assuming you have Xcode installed and has "/usr/local/bin" as part of your PATH that precedes "/usr/bin", 
+Assuming you have Xcode installed and have "/usr/local/bin" as part of your PATH that precedes "/usr/bin", 
 you can set up Ruby 1.9.2 through the following sequence at the shell prompt:
 
       curl -O ftp://ftp.ruby-lang.org/pub/ruby/1.9/ruby-1.9.2-p180.tar.gz
@@ -103,7 +103,7 @@ are stored in the REPLY-CONTINUATION) of level -3 are restored.
       '↑': unicode 0x2191
       '↓': unicode 0x2193
 
-In MacOS's Terminal application, you can add your faviorite keybindgs under Preference => Settings => Keyboard 
+In MacOS's Terminal application, you can add your favorite keybindings under Preference => Settings => Keyboard 
 for inputting these characters as text. However, this may not work over an SSH connection.
 
 For Cocoa based editors, you can add keybindings through including in the file:
@@ -127,7 +127,7 @@ which maps CTRL-OPTION-[ to '↑' and CTRL-OPTION-] to '↓'.
 
 (1) Esc:     abandons inputs & edits
 
-(2) Return:  when caret is on the last line and pairs of parenstheses and brackets inputted so far 
+(2) Return:  when caret is on the last line and pairs of parentheses and brackets inputted so far 
              respectively match, then the text currently being edited is processed as 3Lisp 
              expression
 
@@ -229,7 +229,7 @@ It is defined as follows:
 This file is automatically loaded when 3LispR is launched. The file already contains many definitions of frequently
 used procedures, providing a basic library.
 
-You can put definitions of your own freuently used procedures in it. Note, however, you won't get any error messages 
+You can put definitions of your own freuqently used procedures in it. However, you won't get any error messages 
 if your definition fails to be successfully processed. Thus, it is best if you have tested your definitions first 
 before including them in init.3lisp.
 
@@ -244,7 +244,7 @@ iAnnotate. This is your best starting point!
 
 8. tests.3lisp
 
-This file includes a fair number of test cases, which also serve to illustarte both basic and unique features of 3Lisp. 
+This file includes a fair number of test cases, which also serve to illustrate both basic and unique features of 3Lisp. 
 A good way to gain a sense of how 3Lisp works is to try these cases and their variations.
 
 
