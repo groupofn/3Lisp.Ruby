@@ -30,7 +30,7 @@ class Object
 
   def struc_type # case-when doesn't work because === does not work over instances of the class Class
     return :ATOM if instance_of?(Symbol)
-    return :NUMERAL if instance_of?(Fixnum) || instance_of?(Bignum)
+    return :NUMERAL if instance_of?(Integer)
     return :BOOLEAN if instance_of?(TrueClass) || instance_of?(FalseClass)
     return :CLOSURE if instance_of?(Closure)
     return :HANDLE if instance_of?(Handle)
@@ -47,7 +47,7 @@ class Object
   end
 
   def numeral?
-    instance_of?(Fixnum) || instance_of?(Bignum)
+    instance_of?(Integer)
   end
   
   def boolean?
@@ -82,7 +82,7 @@ class Object
   def ref_type
     # numeral, boolean, closure, atom, pair, handle, string, environment, or rail
     return quoted.struc_type if handle?    
-    return :NUMBER if instance_of?(Fixnum) || instance_of?(Bignum)
+    return :NUMBER if instance_of?(Integer)
     return :"TRUTH-VALUE" if instance_of?(TrueClass) || instance_of?(FalseClass)
     return :FUNCTION if instance_of?(Closure)
     return :SEQUENCE if instance_of?(Rail)
